@@ -1,0 +1,18 @@
+# define-err golden file: category tables (dev/PLAN.md 7.8). Frozen at 1.0.
+# columns: variant	name	grpc	http	exit	transient	retry_advice	default_severity	severity_value	default_action	default_public_message
+Cancelled	cancelled	1	499	130	no	No	DEBUG	5	None	The request was cancelled.
+Unknown	unknown	2	500	70	no	No	ERROR	17	Operator	An unexpected error occurred.
+InvalidArgument	invalid_argument	3	400	64	no	No	WARNING	13	FixRequest	The request is not valid.
+DeadlineExceeded	deadline_exceeded	4	504	75	yes	No	ERROR	17	Retry	The request took too long. Try again.
+NotFound	not_found	5	404	66	no	No	WARNING	13	FixRequest	The requested item was not found.
+AlreadyExists	already_exists	6	409	73	no	No	WARNING	13	FixRequest	The item already exists.
+PermissionDenied	permission_denied	7	403	77	no	No	WARNING	13	FixRequest	You do not have permission to do this.
+ResourceExhausted	resource_exhausted	8	429	75	yes	Later	ERROR	17	Retry	Too many requests. Try again later.
+FailedPrecondition	failed_precondition	9	400	78	no	AfterFix	WARNING	13	FixRequest	The request cannot be done in the current state.
+Aborted	aborted	10	409	75	yes	RestartTransaction	WARNING	13	Retry	The request conflicted with another. Try again.
+OutOfRange	out_of_range	11	400	65	no	No	WARNING	13	FixRequest	A value is out of range.
+Unimplemented	unimplemented	12	501	70	no	No	ERROR	17	Operator	This operation is not supported.
+Internal	internal	13	500	70	no	No	ERROR	17	Operator	An internal error occurred.
+Unavailable	unavailable	14	503	69	yes	Yes	ERROR	17	Retry	The service is unavailable. Try again later.
+DataLoss	data_loss	15	500	74	no	No	CRITICAL	20	PageOnCall	An internal error occurred.
+Unauthenticated	unauthenticated	16	401	77	no	No	WARNING	13	FixRequest	Authentication is required.

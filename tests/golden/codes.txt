@@ -1,0 +1,19 @@
+# define-err golden file: code packing (dev/PLAN.md 7.6). Frozen at 1.0.
+# Character values: '0'-'9' = 1-10, 'A'-'Z' = 11-36, 0 = padding after the last character.
+# namespace field = base-37 value of six characters, first character most significant.
+# raw = namespace << 32 | (width - 1) << 29 | number; identity = raw with bits 29-31 cleared.
+# columns: text	namespace	number	width	namespace_field_hex	raw_hex	identity_hex
+A-0000	A	0	4	2d772727	2d77272760000000	2d77272700000000
+DB-0000	DB	0	4	3b34a2f2	3b34a2f260000000	3b34a2f200000000
+DB-0001	DB	1	4	3b34a2f2	3b34a2f260000001	3b34a2f200000001
+DB-0042	DB	42	4	3b34a2f2	3b34a2f26000002a	3b34a2f20000002a
+DB-12345	DB	12345	4	3b34a2f2	3b34a2f260003039	3b34a2f200003039
+DIS-00001	DIS	1	5	3c133b92	3c133b9280000001	3c133b9200000001
+EXE-00002	EXE	2	5	41d77a70	41d77a7080000002	41d77a7000000002
+CV-00001	CV	1	5	394e7af1	394e7af180000001	394e7af100000001
+CFG-0001	CFG	1	4	37920f8e	37920f8e60000001	37920f8e00000001
+AUTH-0007	AUTH	7	4	31053c7e	31053c7e60000007	31053c7e00000007
+GW-0000	GW	0	4	49f37f36	49f37f3660000000	49f37f3600000000
+Z9-3	Z9	3	1	95e9bf5e	95e9bf5e00000003	95e9bf5e00000003
+ZZZZZZ-16777215	ZZZZZZ	16777215	8	98ede0c8	98ede0c8e0ffffff	98ede0c800ffffff
+A00000-09	A00000	9	2	2d948b74	2d948b7420000009	2d948b7400000009

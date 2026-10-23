@@ -7,24 +7,25 @@
 >
 > **Consumers waiting on this crate:** L2 (derive) starts from `docs/GENERATED-CODE.md` once 0.2 is approved; L3 (report-err) needs the 0.2 answers to its requests X-1 to X-12 before its 0.4.
 
-## v0.1.0 - Scaffold
+## v0.1.0 - Scaffold (DONE, 2026-10-23)
 Exit: CI green on every job; the crate published to claim the name.
 - [x] Repository `jamesgober/define-err` created and cloned to `error-collection/define-err` (D-001).
 - [x] Manifest (edition 2021, MSRV 1.81, features `std` (default), `alloc`, `testing`, zero dependencies), README, CHANGELOG, REPS, dual license, `deny.toml`, `clippy.toml`, `rustfmt.toml`, `.editorconfig`, `.gitattributes`.
 - [x] `src/lib.rs`: `#![no_std]`, crate docs, lint attributes (`deny(unsafe_code)`, `deny(missing_docs)`, `docsrs`), `VERSION` (ROOT-01), one test per feature mode (D-005).
 - [x] `dev/PLAN.md` (the specification as the plan, decision log D-001 to D-007), `dev/DIRECTIVES.md`, `dev/ROADMAP.md`.
 - [x] CI: Linux, macOS, Windows on x86_64 and aarch64, stable and 1.81, four feature modes; `no_std` cross-check job; Miri; package; security job (D-007).
-- [ ] CI green, tagged, released, published.
+- [x] CI green on all 20 jobs, tagged `v0.1.0`, GitHub pre-release, published on crates.io (2026-10-23).
 
 ## v0.2.0 - Design lock
 Exit: James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
-- [ ] `docs/API.md` for every item in `PLAN.md` section 8 (signatures, errors, examples), each marked with the version it arrives in.
-- [ ] `docs/GENERATED-CODE.md`: the contract of `PLAN.md` 7.5 with full expansions for every form of 7.4 and the `__private` versioning rule, ready for the L2 owner.
-- [ ] Probe format, code layout, category tables, and kind bits written as golden files (`tests/golden/`), before the code that produces them.
-- [ ] Every open decision in `PLAN.md` section 17 answered by James or accepted as recommended, each in the decision log.
-- [ ] report-err's cross-crate requests (X-1 a `NonZero` inside `Code`, X-7 `ErrorRecord::new` plus `push_chain`, X-8 a `report_record` verb, X-9 a creation-hook slot) decided and recorded.
-- [ ] Simplicity review (standard 2.10): the `PLAN.md` 8.2 example can be written from the README alone.
-- [ ] One new defence idea recorded (`PLAN.md` 10.2).
+- [x] `docs/API.md` for every item in `PLAN.md` section 8 (signatures, errors, examples), each marked with the version it arrives in (2026-10-23).
+- [x] `docs/GENERATED-CODE.md`: the contract of `PLAN.md` 7.5 with full expansions for every form of 7.4 and the `__private` versioning rule, ready for the L2 owner (2026-10-23).
+- [x] Probe format, code layout, category tables, severity names, and kind bits written as golden files (`tests/golden/`), before the code that produces them; the probe builder and the source dispatch were prototyped on 1.81 and match them.
+- [x] Every open decision in `PLAN.md` section 17 answered: OD-1 by James, the rest accepted as recommended (D-002 to D-004, D-018).
+- [x] report-err's cross-crate requests decided: X-1 (D-008), X-7 (D-009), X-8 (D-010), X-9 (D-011) all accepted; X-12 stability (D-019).
+- [x] Simplicity review (standard 2.10): the Tier 1 example is one block plus two calls; verbs called by path, metadata through one prelude import (D-013).
+- [x] One new defence idea recorded (`PLAN.md` 10.2: error text never echoes rejected input, D-017).
+- [ ] James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
 
 ## v0.3.0 - Core: thiserror parity
 API: DEF-01 to DEF-12, DEF-27, INF-01 (trait with defaults), INF-07, SEC-01 to SEC-03, ROOT-02, ROOT-03.
@@ -43,7 +44,7 @@ Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_
 - [ ] Edge cases E-33 to E-64, E-87 to E-89.
 
 ## v0.5.0 - Feature complete: facade and record
-API: FAC-01 to FAC-18, REC-01 to REC-06, TST-01, TST-02, DEF-24.
+API: FAC-01 to FAC-18, FAC-20, FAC-21, REC-01 to REC-07, TST-01, TST-02, DEF-24.
 Exit: every P0, P1, and P2 item exists; a prototype L7 reporter (in a test) receives every verb with correct locations.
 - [ ] Reporter slot with loom models and Miri; control word; verbs; once-per-site flags and table; reentrancy and panic isolation (loom CI job added).
 - [ ] `ErrorRecord` with limits and the bounded writer.
