@@ -1,0 +1,83 @@
+# =============================================================================
+#  R E P S   ·   define-err
+# =============================================================================
+[package]
+name    = "define-err"
+version = "0.1.0"
+
+# Minimum Supported Rust Version (MSRV)
+# 1.81: the first release with `core::error::Error`, which `no_std` errors and
+# generated code need. Every crate that defines errors depends on this one, so
+# its MSRV caps theirs. Edition 2021 follows. See dev/PLAN.md, D-002.
+rust-version = "1.81"
+edition = "2021"
+
+# License
+license = "Apache-2.0 OR MIT"
+
+# Readme
+readme = "README.md"
+
+# Description
+description = "Typed error definitions without a proc macro: thiserror-style Display, source, and From, plus optional stable error codes, severity, categories, kind masks, a code catalog, and a reporting facade any crate can call. no_std, zero dependencies."
+
+# Keywords (5 max)
+keywords = ["error", "error-handling", "error-codes", "no-std", "thiserror"]
+
+# Categories
+categories = ["rust-patterns", "no-std", "development-tools::debugging"]
+
+# Links
+homepage      = "https://github.com/jamesgober/define-err"
+repository    = "https://github.com/jamesgober/define-err"
+documentation = "https://docs.rs/define-err"
+
+# Authors
+authors = ["James Gober <me@jamesgober.com>"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lib]
+name = "define_err"
+path = "src/lib.rs"
+
+
+# FEATURE FLAGS
+# #################################
+# The crate is `no_std`. `core` is always used; each feature adds one layer.
+# dev/PLAN.md section 7.2 lists what each feature enables as the versions land.
+[features]
+default = ["std"]
+
+# `std::io::Error` mappings, the facade's reentrancy guard and panic isolation.
+std = ["alloc"]
+
+# `ErrorRecord`, boxed `dyn Error` sources, `set_boxed_reporter`.
+alloc = []
+
+# `testing::capture` and `CaptureReporter` for tests of code that reports.
+testing = ["std"]
+
+
+# DEPENDENCIES
+# #################################
+[dependencies]
+# None, in every feature combination (dev/PLAN.md NFR-1). Every first-party
+# crate will depend on this one, so it depends on nothing.
+
+
+# DEV DEPENDENCIES
+# #################################
+[dev-dependencies]
+
+
+# RELEASE PROFILE
+# #################################
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "symbols"
