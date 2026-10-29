@@ -55,6 +55,13 @@ Locked at the `0.2.0` design lock. The items described here ship in `0.3.0` (def
 
 In the expansions below, paths are written in full once and then shortened: `$crate` stands for `::define_err`, and `core` for `::core`. Generated helper names start with `__define_err_` and are private to the user's module.
 
+The expansions are shown in the shape of a hand-written impl, for reading. The real expansion differs only in form, never in behaviour:
+
+- every arm matches `*self` and binds every field with `ref` (`match *self { Self::NotFound { ref page } => ... }`), which gives the same `&T` bindings and also works for an enum with no variants;
+- `source()` and `ErrorInfo::location` are always a full `match`, returning `None` for variants that have no source or location (PLAN D-025);
+- each generated impl carries `#[allow(deprecated)]`, so a `#[deprecated]` variant warns where the user names it, never inside generated code;
+- unnamed tuple fields are bound as `__define_err_source` (a `#[from]` or `#[source]` field), `__define_err_location` (a `#[location]` field), or `__define_err_0` to `__define_err_15` (any other), and the `From` parameter is `__define_err_value`; these names are hygienic and never clash with the user's.
+
 ## Items generated for every type
 
 For a type `T` with variants `V1..Vn` (a struct is one variant):
@@ -63,7 +70,7 @@ For a type `T` with variants `V1..Vn` (a struct is one variant):
 |---|---|---|
 | G1 | the type | user attributes passed through; `#[derive(::core::fmt::Debug)]` unless `#[manual_debug]`; `#[non_exhaustive]` on enums unless `#[exhaustive]` or the user already wrote `#[non_exhaustive]` (never a second copy; structs: never added, because it would forbid construction outside the crate); field markers removed; `#[location]` fields keep their declared type, which must be `$crate::Location` |
 | G2 | `impl ::core::fmt::Display for T` | one `match self` with one arm per variant binding every field by its name (tuple fields by their binding name, or `_` when unnamed); the arm calls `::core::write!(f, <format string> [, <arguments>])`; `transparent` arms call `::core::fmt::Display::fmt(inner, f)`; `#[allow(unused_variables)]` on the match |
-| G3 | `impl ::core::error::Error for T` | `source()`: per variant, `$crate::__private::source_of!(field)` for the source field, `transparent` forwards to `::core::error::Error::source(inner)`, otherwise `None`; `description()`: per variant the identity probe string, under `#[allow(deprecated)]`; `transparent` arms forward the inner probe when the inner value has one |
+| G3 | `impl ::core::error::Error for T` | `source()`: per variant, `$crate::__private::source_of!(field)` for the source field, `transparent` forwards to the inner value's own `source()` through `$crate::__private::forward_source!(inner)`, otherwise `None`; from `0.4`, `description()`: per variant the identity probe string, under `#[allow(deprecated)]`; `transparent` arms forward the inner probe when the inner value has one |
 | G4 | `impl ::core::convert::From<S> for T` | one per `#[from]` field; `#[track_caller]`; sets a `#[location]` field to `::core::panic::Location::caller()` |
 | G5 | `impl $crate::ErrorInfo for T` | always generated; methods with no per-variant data are left to the trait defaults; others are one `match self` returning constants or copying a field |
 | G6 | `impl T { pub const <NAME>: $crate::Code = ...; }` | one per `name = NAME` in `#[code]`; `#[deprecated(since, note)]` when the code is deprecated |
@@ -153,7 +160,7 @@ impl $crate::ErrorInfo for PageError {
 }
 ```
 
-(The `# _ =>` line marks an elision in this document; the real expansion lists every arm and has no catch-all.) A plain type gets no `source()` match when no variant has a source, and an `ErrorInfo` impl whose only override is `type_name`: every other method is the trait default (`None`, `Category::Unknown`, `Severity::ERROR`, `Kinds::ERROR`, and so on). A format string that writes no field compiles to the same `write!` call; rustc turns a string with no arguments into a single `write_str`.
+(The `# _ =>` line marks an elision in this document; the real expansion lists every arm and has no catch-all.) A plain type's `source()` returns `None` from every arm, and its `ErrorInfo` impl overrides `location` (`None` from every arm) and `type_name`; every other method is the trait default (from `0.4`: `None`, `Category::Unknown`, `Severity::ERROR`, `Kinds::ERROR`, and so on). A format string that writes no field compiles to the same `write!` call; rustc turns a string with no arguments into a single `write_str`. The `description()` probe arrives in `0.4`; in `0.3` it is the standard library's default.
 
 An enum with zero variants generates `match *self {}` in `fmt`, `source`, `description`, and `type_name`.
 
@@ -293,8 +300,8 @@ impl ::core::fmt::Display for AppError {
 impl ::core::error::Error for AppError {
     fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
         match self {
-            Self::Config(inner) => ::core::error::Error::source(inner),
-            Self::Other(inner) => ::core::error::Error::source(&**inner),
+            Self::Config(inner) => $crate::__private::forward_source!(inner),   // inner.source()
+            Self::Other(inner) => $crate::__private::forward_source!(inner),    // (**inner).source()
         }
     }
 
@@ -674,8 +681,12 @@ Rules the macro itself rejects with `compile_error!` (each names the fix): `#[co
 
 | Item | Signature or form | Purpose | Since |
 |---|---|---|---|
-| `source_of!` | `source_of!(expr) -> Option<&(dyn Error + 'static)>` | source dispatch for `E: Error`, `Option<E>`, boxed `dyn Error` (three forms), `&'static dyn Error` | 0.3 |
-| `info_of!` | `info_of!(expr) -> Option<&dyn ErrorInfo>` | `ErrorInfo` forwarding for transparent variants | 0.4 |
+| `source_of!` | `source_of!(expr) -> Option<&(dyn Error + 'static)>` | source dispatch for `E: Error`, `Option<E>`, boxed `dyn Error` (three forms), `&'static dyn Error`; any other type fails with a plain-words `SourceField` error | 0.3 |
+| `forward_source!` | `forward_source!(expr) -> Option<&(dyn Error + 'static)>` | the inner value's own `source()` for transparent variants, including boxed trait objects | 0.3 |
+| `info_of!` | `info_of!(expr) -> Option<&dyn ErrorInfo>` | `ErrorInfo` forwarding for transparent variants | 0.3 |
+| `Wrap`, dispatch traits | `struct Wrap<'a, T: ?Sized>(pub &'a T)`; `SourceViaError`, `SourceViaOption`, `SourceViaObject`, `SourceViaNothing`, `ForwardViaError`, `ForwardViaObject`, `InfoViaErrorInfo`, `InfoViaNothing` | the autoref dispatch behind the three macros above | 0.3 |
+| `SourceField` | `trait SourceField` with `#[diagnostic::on_unimplemented]`, implemented for every `E: Error` | the compile error for a source field that is not an error | 0.3 |
+| internal macros | `__define_err_block!`, `__define_err_type!`, `__define_err_enum!`, `__define_err_fields!`, `__define_err_emit!`, `__define_err_fmt!`, `__define_err_source!`, `__define_err_location!`, `__define_err_type_name!`, `__define_err_transparent!`, `__define_err_from!` | the parser and the emitter (`#[doc(hidden)]`, exported because `macro_rules!` helpers must be); the attribute front end calls none of them | 0.3 |
 | `retry_after_of!` | `retry_after_of!(expr) -> Option<Duration>` | `#[retry_after]` fields of type `Duration` or `Option<Duration>` | 0.4 |
 | `namespace` | `const fn namespace(text: &str, width: u8) -> Namespace` | the block's namespace; panics in const evaluation on invalid input | 0.4 |
 | `code` | `const fn code(namespace: Namespace, number: u32) -> Code` | a code constant; panics in const evaluation when out of range | 0.4 |

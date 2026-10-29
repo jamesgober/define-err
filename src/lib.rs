@@ -7,54 +7,76 @@
 //! conversions asked for: the code a person would write by hand, and the
 //! code thiserror generates.
 //!
-//! Everything beyond that is optional and costs nothing until it is used:
-//! stable error codes (`DB-0042`) with a compile-time catalog, severity on
-//! the OpenTelemetry scale, categories that map to HTTP, gRPC, and exit
-//! codes, kind masks, public and private messages, retry advice, secret
-//! redaction, an owned error record, and a reporting facade any crate can
-//! call (`report`, `notice`, `warn`, `trigger`) at the cost of one atomic
-//! load when no reporter is installed.
-//!
-//! The crate is `no_std` with optional `alloc` and `std` layers, and has no
-//! dependencies.
-//!
 //! ## Tier 1
 //!
 //! ```
-//! println!("define-err {}", define_err::VERSION);
-//! ```
+//! use define_err::prelude::*;
 //!
-//! The Tier 1 entry points arrive from `0.3.0` on:
-//!
-//! ```text
 //! define_errors! {
-//!     pub enum PageError {
-//!         NotFound { page: u64 } => "page {page} not found",
-//!         Io(#[from] source: std::io::Error) => "page file i/o failed",
+//!     /// Errors from loading the configuration.
+//!     pub enum ConfigError {
+//!         Missing { key: String } => "missing key {key}",
+//!         BadValue { key: String, file: String } => "bad value for {key} in {file}",
+//!         Read(#[from] source: std::io::Error) => "cannot read the configuration: {source}",
 //!     }
 //! }
 //!
-//! define_err::report(&err);                        // never changes control flow
-//! define_err::warn("cache file is stale");         // once per call site
+//! fn load(path: &str) -> Result<String, ConfigError> {
+//!     let text = std::fs::read_to_string(path)?;          // From<io::Error>
+//!     if text.is_empty() {
+//!         return Err(ConfigError::Missing { key: "name".into() });
+//!     }
+//!     Ok(text)
+//! }
+//!
+//! let err = load("/does/not/exist").unwrap_err();
+//! assert!(err.to_string().starts_with("cannot read the configuration"));
+//! assert!(std::error::Error::source(&err).is_some());
 //! ```
+//!
+//! Each variant is one line; a plain error type needs nothing else. Enums
+//! get `#[non_exhaustive]` (unless marked `#[exhaustive]`) so they can grow
+//! without breaking callers. The full grammar is on [`define_errors!`].
+//!
+//! [`Secret<T>`](Secret) keeps tokens and passwords out of every `Display`
+//! and `Debug` output:
+//!
+//! ```
+//! use define_err::prelude::*;
+//!
+//! define_errors! {
+//!     pub enum AuthError {
+//!         BadToken { token: Secret<String> } => "token {token} rejected",
+//!     }
+//! }
+//!
+//! let err = AuthError::BadToken { token: Secret::new("s3cr3t".into()) };
+//! assert_eq!(err.to_string(), "token [redacted] rejected");
+//! ```
+//!
+//! Optional stable error codes (`DB-0042`) with a compile-time catalog,
+//! severity, categories that map to HTTP, gRPC, and exit codes, kind masks,
+//! public messages, and retry advice arrive in `0.4.0`; a reporting facade
+//! any crate can call (`report`, `notice`, `warn`, `trigger`) arrives in
+//! `0.5.0`. Errors are values: nothing is reported unless code reports it,
+//! and building an error never runs any code.
 //!
 //! ## Features
 //!
 //! | Feature | Default | Brings |
 //! |---|---|---|
-//! | `std` | yes | `std::io::Error` mappings; reentrancy guard and panic isolation in the facade. Implies `alloc`. |
-//! | `alloc` | through `std` | `ErrorRecord`, boxed `dyn Error` sources, `set_boxed_reporter`. |
-//! | `testing` | no | a capturing reporter for tests. Implies `std`. |
+//! | `std` | yes | implies `alloc`; from `0.4.0`, `std::io::Error` mappings |
+//! | `alloc` | through `std` | boxed `dyn Error` sources (`Box<dyn Error + Send + Sync>` and friends) |
+//! | `testing` | no | implies `std`; from `0.5.0`, a capturing reporter for tests |
 //!
-//! With `--no-default-features` the crate uses `core` only.
+//! With `--no-default-features` the crate uses `core` only, and every
+//! `define_errors!` form works except boxed sources.
 //!
 //! ## Status
 //!
-//! Design lock. The public API of 1.0 is written in `docs/API.md` and what
-//! the macro expands to in `docs/GENERATED-CODE.md`; the design and the
-//! version plan are in `dev/PLAN.md` and `dev/ROADMAP.md` (all in the
-//! [repository](https://github.com/jamesgober/define-err)). The
-//! thiserror-parity core ships in `0.3.0`.
+//! `0.3.0`: the thiserror-parity core. The public API of 1.0 is written in
+//! `docs/API.md` and what the macro expands to in `docs/GENERATED-CODE.md`
+//! (both in the [repository](https://github.com/jamesgober/define-err)).
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/define-err")]
@@ -86,6 +108,43 @@
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
+
+mod info;
+mod location;
+mod macros;
+mod secret;
+
+#[doc(hidden)]
+#[path = "private.rs"]
+pub mod __private;
+
+pub use crate::{
+    info::ErrorInfo,
+    location::{here, Location},
+    secret::Secret,
+};
+
+/// The one import a caller needs: `use define_err::prelude::*;`.
+///
+/// Brings [`define_errors!`], [`ErrorInfo`] (the trait behind `.location()`,
+/// `.type_name()`, and, from `0.4.0`, `.code()` and `.category()`),
+/// [`Secret`], and [`Location`]. The reporting verbs (from `0.5.0`) are not
+/// in the prelude: they are called by path, `define_err::report(&err)`.
+///
+/// # Examples
+///
+/// ```
+/// use define_err::prelude::*;
+///
+/// define_errors! {
+///     pub struct Cancelled => "operation cancelled";
+/// }
+///
+/// assert_eq!(Cancelled.type_name(), "Cancelled");
+/// ```
+pub mod prelude {
+    pub use crate::{define_errors, ErrorInfo, Location, Secret};
+}
 
 /// Crate version string, populated by Cargo at build time.
 ///

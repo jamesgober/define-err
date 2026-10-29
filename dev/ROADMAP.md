@@ -27,13 +27,15 @@ Exit: James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
 - [x] One new defence idea recorded (`PLAN.md` 10.2: error text never echoes rejected input, D-017).
 - [x] James approves `docs/API.md` and `docs/GENERATED-CODE.md` (2026-10-29, D-023).
 
-## v0.3.0 - Core: thiserror parity
+## v0.3.0 - Core: thiserror parity (DONE, 2026-10-29)
 API: DEF-01 to DEF-12, DEF-27, INF-01 (trait with defaults), INF-07, SEC-01 to SEC-03, ROOT-02, ROOT-03.
 Exit: page-db's test suite passes on a pilot branch with byte-identical messages; construction and `Display` benchmark identical to thiserror.
-- [ ] `define_errors!` fast and general paths; every compile error of `PLAN.md` 8.3 with a `trybuild` case (CI job added).
-- [ ] Conformance suite against thiserror (12.1); `no_prelude` and naming tests (E-5, E-6).
-- [ ] Edge cases E-1 to E-32 (those not needing 0.4 metadata), E-96 to E-100.
-- [ ] Pilot migration of page-db on a branch; findings in the decision log.
+- [x] `define_errors!` fast and general paths (D-024); every 0.3 compile error of `PLAN.md` 8.3 with a `trybuild` case, 23 cases in `tests/ui`, CI job pinned to 1.99 (D-030).
+- [x] Conformance suite against thiserror (`tests/conformance.rs`): byte-identical `Display` and `source()` chains; `no_prelude` and naming tests (E-5, E-6).
+- [x] Edge cases E-1 to E-32 that need no 0.4 metadata, and E-96 to E-100 (E-100 as two compile-fail cases: no `Deref`, no `PartialEq`). E-27 (`#[cfg]` on variants) is 0.5 with DEF-24, as the API grades it.
+- [x] 500 mixed variants at the default `recursion_limit` (`tests/big_enum.rs`); zero allocations for construction, `Display`, `source()`, `ErrorInfo`, `From`, and `Secret` (`tests/alloc_free.rs`).
+- [x] Pilot migration of page-db in a scratch copy: all 65 tests and doctests pass, clippy and rustdoc clean, messages unchanged (D-031).
+- [x] Benchmark: `Display` and construction identical to thiserror and to hand-written code within noise (D-032).
 
 ## v0.4.0 - Extended: codes and metadata
 API: DEF-13 to DEF-23, DEF-25, CODE-01 to CODE-09, SEV-01 to SEV-04, CAT-01 to CAT-07, KND-01 to KND-05, INF-01 (all methods) to INF-06, PRB-01 to PRB-03.

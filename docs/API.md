@@ -103,7 +103,7 @@ Costs are estimates (marked [est.]) until they are measured in `0.6.0`; measured
 
 ```toml
 [dependencies]
-define-err = "0.2.0"
+define-err = "0.3.0"
 ```
 
 ### Features
@@ -122,7 +122,7 @@ The crate is `#![no_std]`. `default-features = false` gives `core` only: every m
 
 ```toml
 [dependencies]
-define-err = { version = "0.2.0", default-features = false }
+define-err = { version = "0.3.0", default-features = false }
 ```
 
 MSRV is 1.81, the first release with `core::error::Error`.
@@ -576,7 +576,9 @@ Misuse is a compile error that names the problem and the fix. Each has a `trybui
 | no constants for every code by default | a declarative macro cannot upper-case `Timeout` to `TIMEOUT` | `name = TIMEOUT` |
 | no generated constructors | the same reason, and thiserror has none | build variants directly; `here()` for location fields |
 
-An enum of 500 variants compiles at the default `recursion_limit` (NFR-6).
+An enum of 500 variants compiles at the default `recursion_limit` (NFR-6) when it is written in the canonical form: doc comments first on variants and fields, a field marker (`#[from]`, `#[source]`, `#[location]`) right before the field name, and tuple fields named. Any other form works too, through a slower path that costs one macro step per variant and per irregular attribute; a very large enum written that way may need `#![recursion_limit = "256"]`. A tuple variant may have at most sixteen unnamed fields besides its source and location; name them or use a braced variant.
+
+Attributes passed through on a variant: doc comments, `#[allow]`, `#[warn]`, `#[deny]`, `#[forbid]`, `#[expect]`, `#[deprecated]`, and (from `0.4`) the metadata attributes below. On a field: doc comments and the field markers. Anything else is a compile error that lists what is valid there.
 
 ### From thiserror
 
@@ -596,7 +598,7 @@ An enum of 500 variants compiles at the default `recursion_limit` (NFR-6).
 
 ## `ErrorInfo`
 
-Since `0.3` with defaults (INF-01); all methods generated from `0.4`.
+Since `0.3` (INF-01): in `0.3` the trait has `location` and `type_name`; the other methods arrive in `0.4`, each with a default, so an implementation written against `0.3` keeps compiling.
 
 ```rust
 pub trait ErrorInfo: core::error::Error {
@@ -1342,6 +1344,8 @@ impl<T> core::fmt::Display for Secret<T>;   // "[redacted]"
 A field type that keeps a value out of every `Display` and `Debug` output: both print `[redacted]` whatever the format flags (width and alignment are honoured around the word, so tables stay aligned). The value comes back only through `expose()` and `into_inner()`, which are easy to search for in review.
 
 `Secret` implements neither `Deref`, `AsRef`, `Borrow`, nor `PartialEq`: each would let the value slip into a format string or a timing-unsafe comparison. Wiping memory on drop is not done here (that needs `unsafe` volatile writes and is the job of the crypto crates); `Secret` only redacts output.
+
+**Fields that must be `Secret`:** tokens, passwords, API keys, session ids, signed URLs, connection strings with credentials, and any personal data a log must not hold. `#[derive(Debug)]`, which every error type has, prints every field; a plain `String` field holding a token reaches every log that prints the error with `{:?}`.
 
 ```rust
 use define_err::{define_errors, Secret};

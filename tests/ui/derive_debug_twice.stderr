@@ -1,0 +1,13 @@
+error[E0119]: conflicting implementations of trait `Debug` for type `E`
+ --> tests/ui/derive_debug_twice.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     #[derive(Debug)]
+  | |              ----- first implementation here
+5 | |     pub enum E {
+6 | |         A => "a",
+7 | |     }
+8 | | }
+  | |_^ conflicting implementation for `E`
+  |
+  = note: this error originates in the derive macro `::core::fmt::Debug` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

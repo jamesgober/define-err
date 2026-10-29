@@ -13,6 +13,59 @@
 
 ---
 
+## [0.3.0] - 2026-10-29
+
+The thiserror-parity core.
+
+### Added
+
+- `define_errors!`: enums and structs (braced, tuple, unit) with `Display`
+  from `=> "message"` (fields by name, any format spec, `{{` and `}}`),
+  extra format arguments `=> ("...", expr, name = expr)`, and
+  `=> transparent`; `core::error::Error` with `source()` from `#[source]`,
+  `#[from]`, or a field named `source`, including `Option<E>`, boxed
+  `dyn Error` (three forms, with `alloc`), and `&'static dyn Error`;
+  `From` conversions from `#[from]`, marked `#[track_caller]`, filling a
+  `#[location]` field with the line of the `?`; `#[derive(Debug)]` unless
+  `#[manual_debug]`; `#[non_exhaustive]` on enums unless `#[exhaustive]`;
+  doc comments and lint attributes passed through; several types per block;
+  tuple-field binding names (`ShortRead(page: u64, got: usize)`) and unnamed
+  tuple fields.
+- `ErrorInfo` with `location()` and `type_name()` (`"Type::Variant"`),
+  implemented by every generated type; `transparent` variants forward both.
+- `Location` and `here()`.
+- `Secret<T>`: prints `[redacted]` under `Display` and `Debug` with any
+  flags (width, fill, and alignment honoured; precision ignored), with
+  `new`, `expose`, `into_inner`, `From<T>`, and no `Deref` or `PartialEq`.
+- `prelude`: `define_errors!`, `ErrorInfo`, `Location`, `Secret`.
+- Compile errors that name the problem and the fix for every misuse
+  (unknown attributes, two sources, two locations, two markers on a field,
+  `#[from]` with extra fields, `transparent` without exactly one field, a
+  missing message, a bad message form, `#[exhaustive]` on a struct, a source
+  field that is not an error), with 23 compile-fail tests.
+- Tests: a conformance suite against thiserror (byte-identical `Display` and
+  `source()` chains), a 500-variant enum at the default `recursion_limit`,
+  generated code without the prelude and next to types named `Error`,
+  `Result`, `Option`, `Box`, `Display`, `Location`, `Code`, size and auto-trait
+  checks against hand-written and thiserror enums, and a counting allocator
+  proving construction, `Display`, `source()`, `ErrorInfo`, `From`, and
+  `Secret` formatting allocate nothing.
+- A criterion benchmark of construction and `Display` against thiserror and
+  hand-written code.
+
+### Changed
+
+- `docs/GENERATED-CODE.md` describes the expansion as built: `source()` and
+  `location()` are always generated, arms bind fields with `ref` on
+  `match *self`, impls carry `#[allow(deprecated)]`, and the `__private`
+  dispatch items are listed.
+- `docs/API.md`: the canonical form and the recursion note, the attributes
+  passed through, and which fields must be `Secret`.
+- CI: dependencies for the 1.81 jobs are resolved against `rust-version`, and
+  the compile-fail tests run in their own job pinned to Rust 1.99.
+
+---
+
 ## [0.2.0] - 2026-10-29
 
 The design lock, approved by James. No functional code yet.
@@ -80,6 +133,7 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jamesgober/define-err/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/define-err/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/define-err/releases/tag/v0.1.0
