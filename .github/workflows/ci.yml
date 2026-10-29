@@ -126,6 +126,8 @@ jobs:
   miri:
     name: Miri
     runs-on: ubuntu-latest
+    # Isolation is off because tests convert a real `io::Error` from opening a
+    # file that does not exist; nothing else touches the host.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly
@@ -135,11 +137,11 @@ jobs:
       - name: Miri (all features)
         run: cargo miri test --all-features
         env:
-          MIRIFLAGS: "-Zmiri-strict-provenance"
+          MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-disable-isolation"
       - name: Miri (no default features)
         run: cargo miri test --no-default-features
         env:
-          MIRIFLAGS: "-Zmiri-strict-provenance"
+          MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-disable-isolation"
 
   package:
     name: Package
