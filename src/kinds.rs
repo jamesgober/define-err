@@ -31,8 +31,19 @@ pub struct Kinds(u64);
 
 /// Names of the platform bits in use, index = bit.
 const NAMES: [&str; 13] = [
-    "ERROR", "WARNING", "NOTICE", "DEPRECATED", "SECURITY", "FUTURE", "RUNTIME", "RESOURCE",
-    "CONFIG", "USER", "PANIC", "AUDIT", "TRIGGER",
+    "ERROR",
+    "WARNING",
+    "NOTICE",
+    "DEPRECATED",
+    "SECURITY",
+    "FUTURE",
+    "RUNTIME",
+    "RESOURCE",
+    "CONFIG",
+    "USER",
+    "PANIC",
+    "AUDIT",
+    "TRIGGER",
 ];
 
 impl Kinds {
@@ -350,8 +361,14 @@ mod tests {
         assert!(all.starts_with("ERROR|WARNING|NOTICE"));
         assert!(all.contains("TRIGGER|bit(13)|"));
         assert!(all.ends_with("project(31)"));
-        assert_eq!((Kinds::ERROR | Kinds::SECURITY - Kinds::ERROR).to_string(), "ERROR|SECURITY");
-        assert_eq!(((Kinds::ERROR | Kinds::SECURITY) - Kinds::ERROR).to_string(), "SECURITY");
+        assert_eq!(
+            (Kinds::ERROR | (Kinds::SECURITY - Kinds::ERROR)).to_string(),
+            "ERROR|SECURITY"
+        );
+        assert_eq!(
+            ((Kinds::ERROR | Kinds::SECURITY) - Kinds::ERROR).to_string(),
+            "SECURITY"
+        );
     }
 
     #[test]

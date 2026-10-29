@@ -23,7 +23,7 @@
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __define_err_emit {
-    (@enum [[$($ns:tt)*] [$($docs:tt)*] [$($rall:tt)*] [$($rf:tt)*] [$($acc:tt)*] [$($rest:tt)*]]
+    (@enum [$ns:tt $docs:tt $rall:tt $rf:tt [$($acc:tt)*] [$($rest:tt)*]]
         [$($tattr:tt)*] ($vis:vis) $name:ident [ $(
         ( [$($vattr:tt)*]
           [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]
@@ -40,7 +40,9 @@ macro_rules! __define_err_emit {
             $(( $( $($xattr)* $xty, )* ))?,
         )* }
 
-        $crate::__define_err_emit! { @impls [[$($ns)*] [$($docs)*] [$($rf)*]] ($vis) $name [ $(
+        $( $crate::__define_err_code!(@check $ns [$($code)?]); )*
+
+        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
             ( [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
               [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
               $({ $( { $frole $fname : $fty } )* })?
@@ -49,11 +51,11 @@ macro_rules! __define_err_emit {
         )* ] }
 
         $crate::__define_err_block! {
-            @types [[$($ns)*] [$($docs)*] [$($rall)*] [] [$($acc)* $( $( { $code } )? )*]] $($rest)*
+            @types [$ns $docs $rall [] [$($acc)* $( $( { $code } )? )*]] $($rest)*
         }
     };
 
-    (@struct [[$($ns:tt)*] [$($docs:tt)*] [$($rall:tt)*] [$($rf:tt)*] [$($acc:tt)*] [$($rest:tt)*]]
+    (@struct [$ns:tt $docs:tt $rall:tt $rf:tt [$($acc:tt)*] [$($rest:tt)*]]
         [$($tattr:tt)*]
         [[$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]]
         ($vis:vis) $name:ident
@@ -65,7 +67,9 @@ macro_rules! __define_err_emit {
             $(( $( { [$($xattr)*] [$($xvis)*] $xname : $xty } )* ))?
         }
 
-        $crate::__define_err_emit! { @impls [[$($ns)*] [$($docs)*] [$($rf)*]] ($vis) $name [
+        $crate::__define_err_code!(@check $ns [$($code)?]);
+
+        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
             ( [Self] [::core::stringify!($name)] [::core::stringify!($name)]
               [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
               $({ $( { $frole $fname : $fty } )* })?
@@ -74,7 +78,7 @@ macro_rules! __define_err_emit {
         ] }
 
         $crate::__define_err_block! {
-            @types [[$($ns)*] [$($docs)*] [$($rall)*] [] [$($acc)* $( { $code } )?]] $($rest)*
+            @types [$ns $docs $rall [] [$($acc)* $( { $code } )?]] $($rest)*
         }
     };
 
@@ -299,13 +303,14 @@ macro_rules! __define_err_catalog {
 #[macro_export]
 macro_rules! __define_err_ns {
     ([$ns:literal]) => {
-        $crate::__private::namespace($ns, 4)
+        $crate::__private::namespace_or_placeholder($ns, 4)
     };
     ([$ns:literal $width:literal]) => {
-        $crate::__private::namespace($ns, $width)
+        $crate::__private::namespace_or_placeholder($ns, $width)
     };
+    // A code without a namespace: reported once, by `@check`.
     ([]) => {
-        ::core::compile_error! { "define_errors!: `#[code]` needs a `namespace = \"...\";` line at the top of the define_errors! block" }
+        $crate::__private::namespace_or_placeholder("A", 4)
     };
 }
 
@@ -317,6 +322,7 @@ macro_rules! __define_err_ns {
 #[macro_export]
 macro_rules! __define_err_code {
     // Operations on a parsed code: [n] [name] [help] [title] [since] [replacement].
+    (@do check [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {};
     (@do number [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
         $n
     };
@@ -324,7 +330,7 @@ macro_rules! __define_err_code {
         &[ $( ($n, $rep) )? ]
     };
     (@do value [$($ns:tt)*] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {{
-        const __DEFINE_ERR_CODE: $crate::Code = $crate::__private::code($crate::__define_err_ns!([$($ns)*]), $n);
+        const __DEFINE_ERR_CODE: $crate::Code = $crate::__private::code_or_placeholder($crate::__define_err_ns!([$($ns)*]), $n);
         __DEFINE_ERR_CODE
     }};
     (@do help [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
@@ -333,7 +339,7 @@ macro_rules! __define_err_code {
     (@do entry [[$($ns:tt)*] [$($docs:literal)?] [$($tname:tt)*] [$($tdefault:tt)*] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?]]
         [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
         $crate::CodeInfo::new(
-            $crate::__private::code($crate::__define_err_ns!([$($ns)*]), $n),
+            $crate::__private::code_or_placeholder($crate::__define_err_ns!([$($ns)*]), $n),
             $crate::__define_err_code!(@title [$($title)?] [$($tdefault)*]),
             $help,
         )
@@ -364,7 +370,7 @@ macro_rules! __define_err_code {
     (@state [$($ns:tt)*] [$since:literal] [$rep:literal]) => {
         $crate::CodeState::Deprecated {
             since: $since,
-            replacement: ::core::option::Option::Some($crate::__private::code($crate::__define_err_ns!([$($ns)*]), $rep)),
+            replacement: ::core::option::Option::Some($crate::__private::code_or_placeholder($crate::__define_err_ns!([$($ns)*]), $rep)),
         }
     };
 
@@ -398,9 +404,32 @@ macro_rules! __define_err_code {
     (@const ($vis:vis) [$($ns:tt)+] [$code:tt]) => {
         $crate::__define_err_code!(@parse const [($vis) [$($ns)+]] $code);
     };
-    (@const ($vis:vis) [] [$code:tt]) => {
+    (@const ($vis:vis) [] [$code:tt]) => {};
+
+    // The one place a malformed `#[code]` is reported; every other reader
+    // falls back to a placeholder so the user sees one message per mistake.
+    (@check [$($ns:tt)*] []) => {};
+    (@check [] [$code:tt]) => {
         ::core::compile_error! { "define_errors!: `#[code]` needs a `namespace = \"...\";` line at the top of the define_errors! block" }
     };
+    (@check [$($ns:tt)+] [$code:tt]) => {
+        $crate::__define_err_code! { @parse check [] $code }
+    };
+
+    (@invalid check [$($message:tt)*]) => { ::core::compile_error! { $($message)* } };
+    (@invalid number [$($message:tt)*]) => { 0_u32 };
+    (@invalid replacement [$($message:tt)*]) => { &[] };
+    (@invalid value [$($message:tt)*]) => {
+        $crate::__private::code_or_placeholder($crate::__private::namespace_or_placeholder("A", 4), 0)
+    };
+    (@invalid help [$($message:tt)*]) => { "" };
+    (@invalid entry [$($message:tt)*]) => {
+        $crate::__private::retired_code($crate::__private::namespace_or_placeholder("A", 4), 0)
+    };
+    (@invalid const [$($message:tt)*]) => {};
+
+    (@width) => { 4 };
+    (@width $width:literal) => { $width };
 
     // Number and replacement, from the block's checks.
     (@number $code:tt) => { $crate::__define_err_code!(@parse number [] $code) };
@@ -413,15 +442,17 @@ macro_rules! __define_err_code {
         $crate::__define_err_code! { @do $op [$($args)*] [$n] [$($cname)?] [$help] [$($title)?] [$($since)?] [$($($rep)?)?] }
     };
     (@parse $op:ident [$($args:tt)*] ($n:literal $(, name = $cname:ident)? $(,)?)) => {
-        ::core::compile_error! { "define_errors!: `#[code]` needs `help = \"...\"`: every code ships with its explanation" }
+        $crate::__define_err_code! { @invalid $op ["define_errors!: `#[code]` needs `help = \"...\"`: every code ships with its explanation"] }
     };
     (@parse $op:ident [$($args:tt)*] ($n:literal $($rest:tt)*)) => {
-        ::core::compile_error! {
+        $crate::__define_err_code! { @invalid $op [
             "define_errors!: write `#[code(n, name = NAME, help = \"...\", title = \"...\", deprecated = \"since\", replacement = n)]` in this order; only the number and `help` are required"
-        }
+        ] }
     };
     (@parse $op:ident [$($args:tt)*] $($rest:tt)*) => {
-        ::core::compile_error! { "define_errors!: a code number must be an integer literal from 0 to 16777215, for example `#[code(42, help = \"...\")]`" }
+        $crate::__define_err_code! { @invalid $op [
+            "define_errors!: a code number must be an integer literal from 0 to 16777215, for example `#[code(42, help = \"...\")]`"
+        ] }
     };
 }
 

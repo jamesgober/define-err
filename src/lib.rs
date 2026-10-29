@@ -54,18 +54,52 @@
 //! assert_eq!(err.to_string(), "token [redacted] rejected");
 //! ```
 //!
-//! Optional stable error codes (`DB-0042`) with a compile-time catalog,
-//! severity, categories that map to HTTP, gRPC, and exit codes, kind masks,
-//! public messages, and retry advice arrive in `0.4.0`; a reporting facade
-//! any crate can call (`report`, `notice`, `warn`, `trigger`) arrives in
-//! `0.5.0`. Errors are values: nothing is reported unless code reports it,
-//! and building an error never runs any code.
+//! ## Codes and metadata
+//!
+//! Each extra is one attribute on the variant that needs it: a stable code
+//! (`DB-0001`) with help text, a [`Category`] that maps to HTTP, gRPC, and
+//! exit codes, a [`Severity`] on the OpenTelemetry scale, [`Kinds`], a
+//! public message, and retry advice. [`ErrorInfo`] reads them back.
+//!
+//! ```
+//! use define_err::prelude::*;
+//!
+//! define_errors! {
+//!     namespace = "DB";
+//!
+//!     pub enum DbError {
+//!         #[code(1, name = TIMEOUT, help = "Raise pool.size or lower the load.")]
+//!         #[category(DeadlineExceeded)]
+//!         Timeout { after_ms: u64 } => "query timed out after {after_ms} ms",
+//!
+//!         #[code(2, help = "Restore the page from a replica, then run a scrub.")]
+//!         #[category(DataLoss)]
+//!         #[severity(CRITICAL)]
+//!         Corrupt { page: u64 } => "page {page} failed its checksum",
+//!     }
+//! }
+//!
+//! let err = DbError::Timeout { after_ms: 5000 };
+//! assert_eq!(err.code(), Some(DbError::TIMEOUT));
+//! assert_eq!(err.code().unwrap().to_string(), "DB-0001");
+//! assert_eq!(err.category().http_status(), 504);
+//! assert!(err.is_retryable());
+//! assert_eq!(DbError::CATALOG.len(), 2);
+//! ```
+//!
+//! Every value is a constant built at compile time, and every mistake (a
+//! duplicate number, a code without help) is a compile error. Libraries
+//! that hold errors as `&dyn Error` read the same facts with [`identify`].
+//!
+//! A reporting facade any crate can call (`report`, `notice`, `warn`,
+//! `trigger`) arrives in `0.5.0`. Errors are values: nothing is reported
+//! unless code reports it, and building an error never runs any code.
 //!
 //! ## Features
 //!
 //! | Feature | Default | Brings |
 //! |---|---|---|
-//! | `std` | yes | implies `alloc`; from `0.4.0`, `std::io::Error` mappings |
+//! | `std` | yes | implies `alloc`; `ErrorInfo` and `Category::from_io_kind` for `std::io::Error` |
 //! | `alloc` | through `std` | boxed `dyn Error` sources (`Box<dyn Error + Send + Sync>` and friends) |
 //! | `testing` | no | implies `std`; from `0.5.0`, a capturing reporter for tests |
 //!
@@ -74,7 +108,8 @@
 //!
 //! ## Status
 //!
-//! `0.3.0`: the thiserror-parity core. The public API of 1.0 is written in
+//! `0.4.0`: the thiserror-parity core, plus codes, the catalog, severity,
+//! categories, kinds, and the identity probe. The public API of 1.0 is written in
 //! `docs/API.md` and what the macro expands to in `docs/GENERATED-CODE.md`
 //! (both in the [repository](https://github.com/jamesgober/define-err)).
 

@@ -1,0 +1,12 @@
+error: define_errors!: `#[code]` needs `help = "..."`: every code ships with its explanation
+ --> tests/ui/code_without_help.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     namespace = "DB";
+5 | |     pub enum E {
+6 | |         #[code(1)]
+... |
+9 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_code` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

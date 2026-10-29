@@ -380,7 +380,9 @@ impl Category {
                 }
             }
         };
-        Category::ALL.into_iter().find(|category| same(category.name()))
+        Category::ALL
+            .into_iter()
+            .find(|category| same(category.name()))
     }
 
     /// The category of a `std::io::ErrorKind`. Kinds without a clear match,

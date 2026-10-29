@@ -1,4 +1,4 @@
-error: define_errors!: unknown attribute on a field; valid here are doc comments, `#[from]`, `#[source]`, and `#[location]`
+error: define_errors!: unknown attribute on a field; valid here are doc comments, `#[from]`, `#[source]`, `#[location]`, and `#[retry_after]`
  --> tests/ui/unknown_field_attribute.rs:3:1
   |
 3 | / define_errors! {

@@ -338,7 +338,10 @@ impl CodeInfo {
     /// ```
     #[must_use]
     pub fn url(&self) -> Option<UrlDisplay<'_>> {
-        self.docs.map(|template| UrlDisplay { template, code: self.code })
+        self.docs.map(|template| UrlDisplay {
+            template,
+            code: self.code,
+        })
     }
 
     /// Whether the code is active (neither deprecated nor retired).
@@ -356,7 +359,7 @@ impl CodeInfo {
 /// use define_err::{code, CodeInfo, CodeState};
 ///
 /// const OLD: CodeInfo = CodeInfo::new(code!("DB", 4), "OldQuota", "Use DB-0010.")
-///     .with_state(CodeState::Deprecated { since: "2.1", replacement: Some(code!("DB", 10)) });
+///     .with_state(CodeState::Deprecated { since: "2.1.0", replacement: Some(code!("DB", 10)) });
 /// assert!(!OLD.is_active());
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -439,7 +442,10 @@ pub mod catalog {
     /// ```
     #[must_use]
     pub fn find(catalogs: &[&'static [CodeInfo]], code: Code) -> Option<&'static CodeInfo> {
-        catalogs.iter().flat_map(|entries| entries.iter()).find(|entry| entry.code == code)
+        catalogs
+            .iter()
+            .flat_map(|entries| entries.iter())
+            .find(|entry| entry.code == code)
     }
 
     /// Checks that no code appears twice across `catalogs`: the boot-time
@@ -568,8 +574,12 @@ mod tests {
 
     #[test]
     fn test_url_display_replaces_every_placeholder() {
-        let info = CodeInfo::new(code(42), "t", "h").with_docs("x/{code}/{namespace}/{number}/{code}/{other}{");
-        assert_eq!(info.url().unwrap().to_string(), "x/DB-0042/DB/42/DB-0042/{other}{");
+        let info = CodeInfo::new(code(42), "t", "h")
+            .with_docs("x/{code}/{namespace}/{number}/{code}/{other}{");
+        assert_eq!(
+            info.url().unwrap().to_string(),
+            "x/DB-0042/DB/42/DB-0042/{other}{"
+        );
         assert!(CodeInfo::new(code(1), "t", "h").url().is_none());
     }
 

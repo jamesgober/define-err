@@ -190,7 +190,10 @@ impl Namespace {
             bytes[i] = value_char(value);
             len = i + 1;
         }
-        NamespaceStr { bytes, len: len as u8 }
+        NamespaceStr {
+            bytes,
+            len: len as u8,
+        }
     }
 
     /// The number of digits codes in this namespace are shown with.
@@ -358,7 +361,10 @@ impl Code {
     #[must_use]
     pub const fn namespace(self) -> Namespace {
         let raw = self.0.get();
-        Namespace { field: (raw >> 32) as u32, width: ((raw & WIDTH_MASK) >> 29) as u8 + 1 }
+        Namespace {
+            field: (raw >> 32) as u32,
+            width: ((raw & WIDTH_MASK) >> 29) as u8 + 1,
+        }
     }
 
     /// The number, 0 to 16,777,215.
@@ -466,17 +472,25 @@ impl Code {
         if bytes.len() > MAX_TEXT {
             return Err(CodeParseError::TooLong);
         }
-        let separator = bytes.iter().position(|&b| b == b'-').ok_or(CodeParseError::MissingSeparator)?;
+        let separator = bytes
+            .iter()
+            .position(|&b| b == b'-')
+            .ok_or(CodeParseError::MissingSeparator)?;
         let field = pack_text(&bytes[..separator])?;
         let digits = &bytes[separator + 1..];
         if digits.is_empty() || digits.len() > 8 || !digits.iter().all(u8::is_ascii_digit) {
             return Err(CodeParseError::BadNumber);
         }
-        let number = digits.iter().fold(0_u32, |n, &d| n * 10 + u32::from(d - b'0'));
+        let number = digits
+            .iter()
+            .fold(0_u32, |n, &d| n * 10 + u32::from(d - b'0'));
         if number > Code::MAX_NUMBER {
             return Err(CodeParseError::NumberTooLarge);
         }
-        let namespace = Namespace { field, width: digits.len() as u8 };
+        let namespace = Namespace {
+            field,
+            width: digits.len() as u8,
+        };
         Code::new(namespace, number).ok_or(CodeParseError::NumberTooLarge)
     }
 }
@@ -682,7 +696,11 @@ mod tests {
     #[test]
     fn test_namespace_invalid_text_rejected() {
         for text in ["", "DB-1", "D B", "1DB", "ABCDEFG", "ÄB", "D_B"] {
-            assert_eq!(Namespace::try_new(text), Err(CodeParseError::BadNamespace), "{text:?}");
+            assert_eq!(
+                Namespace::try_new(text),
+                Err(CodeParseError::BadNamespace),
+                "{text:?}"
+            );
         }
     }
 
@@ -690,8 +708,14 @@ mod tests {
     fn test_namespace_width_bounds() {
         assert!(Namespace::try_with_width("DB", 1).is_ok());
         assert!(Namespace::try_with_width("DB", 8).is_ok());
-        assert_eq!(Namespace::try_with_width("DB", 0), Err(CodeParseError::BadWidth));
-        assert_eq!(Namespace::try_with_width("DB", 9), Err(CodeParseError::BadWidth));
+        assert_eq!(
+            Namespace::try_with_width("DB", 0),
+            Err(CodeParseError::BadWidth)
+        );
+        assert_eq!(
+            Namespace::try_with_width("DB", 9),
+            Err(CodeParseError::BadWidth)
+        );
     }
 
     #[test]
@@ -732,9 +756,17 @@ mod tests {
         assert_eq!(Code::parse("DB-"), Err(CodeParseError::BadNumber));
         assert_eq!(Code::parse("-0042"), Err(CodeParseError::BadNamespace));
         assert_eq!(Code::parse("DB-123456789"), Err(CodeParseError::BadNumber));
-        assert_eq!(Code::parse("DB-16777216"), Err(CodeParseError::NumberTooLarge));
-        assert_eq!(Code::parse("ABCDEFG-12345678"), Err(CodeParseError::TooLong));
-        for text in [" DB-1", "DB-1 ", "DB--1", "DB-+1", "DB-0x2A", "DB-1-2", "DB‐1", "DB-１", "DB-٣"] {
+        assert_eq!(
+            Code::parse("DB-16777216"),
+            Err(CodeParseError::NumberTooLarge)
+        );
+        assert_eq!(
+            Code::parse("ABCDEFG-12345678"),
+            Err(CodeParseError::TooLong)
+        );
+        for text in [
+            " DB-1", "DB-1 ", "DB--1", "DB-+1", "DB-0x2A", "DB-1-2", "DB‐1", "DB-１", "DB-٣",
+        ] {
             assert!(Code::parse(text).is_err(), "{text:?}");
         }
     }
@@ -745,7 +777,10 @@ mod tests {
         assert_eq!(Code::from_u64(code.as_u64()), Some(code));
         assert_eq!(Code::from_u64(0), None);
         assert_eq!(Code::from_u64(code.as_u64() | 1 << 24), None);
-        assert_eq!(Code::from_u64(u64::from(super::NAMESPACE_LIMIT) << 32), None);
+        assert_eq!(
+            Code::from_u64(u64::from(super::NAMESPACE_LIMIT) << 32),
+            None
+        );
         // "D", padding, "B": a character after the padding.
         let gap = (14 * super::POWERS[0] + 12 * super::POWERS[2]) as u64;
         assert_eq!(Code::from_u64(gap << 32), None);
@@ -769,12 +804,21 @@ mod tests {
             c.hash(&mut h);
             h.finish()
         };
-        assert_eq!(hash(Code::parse("DIS-0001").unwrap()), hash(Code::parse("DIS-00001").unwrap()));
+        assert_eq!(
+            hash(Code::parse("DIS-0001").unwrap()),
+            hash(Code::parse("DIS-00001").unwrap())
+        );
     }
 
     #[test]
     fn test_code_parse_error_display_never_echoes_input() {
-        for text in ["DB-0x2A", "\n\u{1b}[31mFORGED", "", "DB--1", "AAAAAAAAAAAAAAAAAAAAA"] {
+        for text in [
+            "DB-0x2A",
+            "\n\u{1b}[31mFORGED",
+            "",
+            "DB--1",
+            "AAAAAAAAAAAAAAAAAAAAA",
+        ] {
             let message = Code::parse(text).unwrap_err().to_string();
             assert!(text.is_empty() || !message.contains(text), "{message}");
             assert!(message.bytes().all(|b| b >= 0x20));

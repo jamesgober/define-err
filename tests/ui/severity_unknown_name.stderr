@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `LOUD` in this scope
+ --> tests/ui/severity_unknown_name.rs:5:20
+  |
+5 |         #[severity(LOUD)]
+  |                    ^^^^ not found in this scope

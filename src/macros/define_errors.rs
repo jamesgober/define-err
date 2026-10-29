@@ -194,6 +194,10 @@ macro_rules! __define_err_block {
     // The block's checks, after its last type.
     (@types [[$ns:literal $($w:literal)?] [$($docs:literal)?] [$($rall:literal)*] [$($rf:tt)*] [$( { $code:tt } )*]]) => {
         const _: () = {
+            // The namespace and every code number are checked here, once;
+            // everywhere else they fall back to placeholders.
+            let namespace = $crate::__private::namespace($ns, $crate::__define_err_code!(@width $($w)?));
+            $( let _ = $crate::__private::code(namespace, $crate::__define_err_code!(@number $code)); )*
             $crate::__private::check_block(
                 ::core::concat!("define_errors!: duplicate code number in namespace ", $ns),
                 &[ $( $crate::__define_err_code!(@number $code) ),* ],

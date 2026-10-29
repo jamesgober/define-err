@@ -262,11 +262,37 @@ pub const fn code(namespace: crate::Namespace, number: u32) -> crate::Code {
     }
 }
 
+/// The block's namespace, or a placeholder when it is invalid. Generated code
+/// uses this everywhere except the one block check that reports the error,
+/// so an invalid namespace is reported once.
+#[doc(hidden)]
+pub const fn namespace_or_placeholder(text: &str, width: u8) -> crate::Namespace {
+    match crate::Namespace::try_with_width(text, width) {
+        Ok(namespace) => namespace,
+        Err(_) => PLACEHOLDER_NAMESPACE,
+    }
+}
+
+/// A code, or a placeholder when the number is out of range (reported once,
+/// by the block check).
+#[doc(hidden)]
+pub const fn code_or_placeholder(namespace: crate::Namespace, number: u32) -> crate::Code {
+    match namespace.code(number) {
+        Some(code) => code,
+        None => PLACEHOLDER_CODE,
+    }
+}
+
+/// The placeholder namespace and code; never seen by users, because the
+/// error that makes them appear stops the build.
+const PLACEHOLDER_NAMESPACE: crate::Namespace = namespace("A", 4);
+const PLACEHOLDER_CODE: crate::Code = code(PLACEHOLDER_NAMESPACE, 0);
+
 /// A retired catalog entry. Const evaluation only.
 #[doc(hidden)]
 pub const fn retired_code(namespace: crate::Namespace, number: u32) -> crate::CodeInfo {
     crate::CodeInfo::new(
-        code(namespace, number),
+        code_or_placeholder(namespace, number),
         "retired",
         "This code is retired and is never reused.",
     )
@@ -375,7 +401,7 @@ const fn starts_with(bytes: &[u8], at: usize, prefix: &[u8]) -> bool {
 }
 
 /// A placeholder entry for building catalog arrays; never seen by users.
-const PLACEHOLDER: crate::CodeInfo = retired_code(namespace("A", 4), 0);
+const PLACEHOLDER: crate::CodeInfo = retired_code(PLACEHOLDER_NAMESPACE, 0);
 
 /// The number of entries in a type's catalog parts.
 #[doc(hidden)]
@@ -466,7 +492,10 @@ impl ProbeBuf {
             bytes[crate::probe::HEADER + n] = name[n];
             n += 1;
         }
-        ProbeBuf { bytes, len: crate::probe::HEADER + name.len() }
+        ProbeBuf {
+            bytes,
+            len: crate::probe::HEADER + name.len(),
+        }
     }
 
     /// The probe text. Const evaluation only.

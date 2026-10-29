@@ -1,0 +1,15 @@
+error[E0080]: evaluation panicked: Kinds::project: the bit must be below 32
+ --> $RUST/core/src/panic.rs
+  |
+  = note: evaluation of `define_err::Kinds::project::<32>::{constant#0}` failed here
+  |
+ ::: src/kinds.rs
+  |
+  |         const { assert!(N < 32, "Kinds::project: the bit must be below 32") };
+  |                 ----------------------------------------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/kinds.rs
+  |
+  |         const { assert!(N < 32, "Kinds::project: the bit must be below 32") };
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

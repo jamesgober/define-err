@@ -1,0 +1,18 @@
+error[E0080]: evaluation panicked: define_errors!: namespace must be 1 to 6 letters or digits, starting with a letter, for example "DB"
+ --> tests/ui/namespace_macro_invalid.rs:2:13
+  |
+2 |     let _ = define_err::namespace!("TOOLONG");
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::NAMESPACE` failed inside this call
+  |
+note: inside `define_err::__private::namespace`
+ --> $RUST/core/src/panic.rs
+  |
+  = note: the failure occurred here
+  |
+ ::: src/private.rs
+  |
+  |           Err(_) => panic!(
+  |  ___________________-
+  | |             "define_errors!: namespace must be 1 to 6 letters or digits, starting with a letter, for example \"DB\""
+  | |         ),
+  | |_________- in this macro invocation

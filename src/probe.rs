@@ -154,7 +154,9 @@ const fn hex_digit(byte: u8) -> Option<u64> {
 
 /// Lowercase hex, exactly `bytes.len()` digits, most significant first.
 fn hex(bytes: &[u8]) -> Option<u64> {
-    bytes.iter().try_fold(0_u64, |value, &byte| Some(value << 4 | hex_digit(byte)?))
+    bytes
+        .iter()
+        .try_fold(0_u64, |value, &byte| Some(value << 4 | hex_digit(byte)?))
 }
 
 /// Decodes a probe string; `None` unless every field is valid.
@@ -204,7 +206,8 @@ mod tests {
         assert!(id.has_public && !id.transparent);
         assert_eq!(id.type_name, "DbError::Timeout");
 
-        let plain = decode("\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound").unwrap();
+        let plain =
+            decode("\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound").unwrap();
         assert!(plain.code.is_none());
         assert_eq!(plain.category, Category::Unknown);
     }

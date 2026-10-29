@@ -68,7 +68,12 @@ impl Severity {
     /// ```
     #[must_use]
     pub const fn at<const N: u8>() -> Severity {
-        const { assert!(N >= 1 && N <= 24, "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)") };
+        const {
+            assert!(
+                N >= 1 && N <= 24,
+                "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)"
+            )
+        };
         severity(N)
     }
 
@@ -215,7 +220,10 @@ impl Severity {
             ("CRITICAL", 20),
             ("FATAL", 21),
         ];
-        if let Some(&(_, value)) = labels.iter().find(|(name, _)| name.eq_ignore_ascii_case(text)) {
+        if let Some(&(_, value)) = labels
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(text))
+        {
             return Severity::new(value);
         }
         OTEL_NAMES
@@ -333,7 +341,10 @@ impl LevelNames {
     /// ```
     #[must_use]
     pub fn severity_of(&self, name: &str) -> Option<Severity> {
-        self.pairs.iter().find(|(entry, _)| entry.eq_ignore_ascii_case(name)).map(|(_, level)| *level)
+        self.pairs
+            .iter()
+            .find(|(entry, _)| entry.eq_ignore_ascii_case(name))
+            .map(|(_, level)| *level)
     }
 }
 
