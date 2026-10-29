@@ -153,7 +153,8 @@ jobs:
         with:
           tool: cargo-fuzz
       - name: Build fuzz targets
-        run: cargo fuzz build
+        # The prebuilt cargo-fuzz is a musl binary and would default to musl.
+        run: cargo fuzz build --target x86_64-unknown-linux-gnu
         env:
           RUSTFLAGS: ""
 
