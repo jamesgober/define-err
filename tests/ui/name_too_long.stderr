@@ -1,0 +1,43 @@
+error[E0080]: evaluation panicked: define_errors!: a type or variant name is longer than 128 bytes
+ --> tests/ui/name_too_long.rs:4:1
+  |
+4 | / define_errors! {
+5 | |     pub enum T {
+6 | |         Vaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...
+7 | |     }
+8 | | }
+  | |_^ evaluation of `<T as std::error::Error>::description::__DEFINE_ERR_PROBE` failed inside this call
+  |
+note: inside `define_err::__private::ProbeBuf::new`
+ --> $RUST/core/src/panic.rs
+  |
+  = note: the failure occurred here
+  |
+ ::: src/private.rs
+  |
+  |             panic!("define_errors!: a type or variant name is longer than 128 bytes");
+  |             ------------------------------------------------------------------------- in this macro invocation
+
+note: erroneous constant encountered
+ --> tests/ui/name_too_long.rs:4:1
+  |
+4 | / define_errors! {
+5 | |     pub enum T {
+6 | |         Vaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...
+7 | |     }
+8 | | }
+  | |_^
+  |
+  = note: this note originates in the macro `$crate::__define_err_probe` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+note: erroneous constant encountered
+ --> tests/ui/name_too_long.rs:4:1
+  |
+4 | / define_errors! {
+5 | |     pub enum T {
+6 | |         Vaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...
+7 | |     }
+8 | | }
+  | |_^
+  |
+  = note: this note originates in the macro `$crate::__define_err_probe` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

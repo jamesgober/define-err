@@ -32,7 +32,7 @@
         <strong>MSRV is 1.81+</strong> (Rust 2021 edition): the first release with <code>core::error::Error</code>.
     </p>
     <blockquote>
-        <strong>Status: core (<code>0.3.0</code>).</strong> <code>define_errors!</code> has thiserror parity: messages, sources, <code>From</code>, <code>transparent</code>, structs, <code>#[non_exhaustive]</code> by default, <code>Secret&lt;T&gt;</code>, and locations. Codes and metadata arrive in <code>0.4.0</code>, the reporting facade in <code>0.5.0</code>. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
+        <strong>Status: codes and metadata (<code>0.4.0</code>).</strong> <code>define_errors!</code> has thiserror parity (messages, sources, <code>From</code>, <code>transparent</code>, structs, <code>#[non_exhaustive]</code> by default, <code>Secret&lt;T&gt;</code>, locations) and optional codes, a compile-time catalog, severity, categories, kinds, public messages, retry advice, and the identity probe. The reporting facade arrives in <code>0.5.0</code>. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
     </blockquote>
 </div>
 
@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.3.0"
+define-err = "0.4.0"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.3.0", default-features = false }            # core only
-define-err = { version = "0.3.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.4.0", default-features = false }            # core only
+define-err = { version = "0.4.0", default-features = false, features = ["alloc"] }
 ```
 
 ## Quick start
@@ -80,9 +80,58 @@ assert!(open("/does/not/exist").is_err());
 
 One line per variant. The enum gets `Debug`, `Display`, `std::error::Error` with `source()`, `From<std::io::Error>`, and `#[non_exhaustive]`; tuple fields get a name so the message can use them. `=> transparent` forwards everything to the one field inside, and `Secret<T>` prints `[redacted]`. Coming from thiserror, `docs/API.md` has the one-to-one mapping; the `Display` output is byte-identical, and a test checks it against thiserror itself.
 
+### Codes and metadata
+
+Each extra is one attribute on the variant that needs it; a variant without any keeps working as before.
+
+```rust
+use define_err::prelude::*;
+
+define_errors! {
+    namespace = "DB";
+    docs = "https://docs.example.com/errors/{code}";
+
+    pub enum DbError {
+        NotFound { page: u64 } => "page {page} not found",
+
+        #[code(1, name = TIMEOUT, help = "Raise pool.size or lower the load.")]
+        #[category(DeadlineExceeded)]
+        #[public("The database is busy. Try again shortly.")]
+        Timeout { after_ms: u64 } => "query timed out after {after_ms} ms",
+
+        #[code(2, help = "Restore the page from a replica, then run a scrub.")]
+        #[category(DataLoss)]
+        #[severity(CRITICAL)]
+        #[kinds(ERROR | SECURITY)]
+        Corrupt { page: u64 } => "page {page} failed its checksum",
+    }
+}
+
+let err = DbError::Timeout { after_ms: 5000 };
+assert_eq!(err.code(), Some(DbError::TIMEOUT));
+assert_eq!(DbError::TIMEOUT.to_string(), "DB-0001");
+assert_eq!(err.category().http_status(), 504);
+assert_eq!(err.public_message(), "The database is busy. Try again shortly.");
+assert!(err.is_retryable());
+
+let corrupt = DbError::Corrupt { page: 7 };
+assert_eq!(corrupt.severity(), Severity::CRITICAL);
+assert!(corrupt.kinds().contains(Kinds::SECURITY));
+
+// Every code with its help text, built at compile time.
+assert_eq!(DbError::CATALOG.len(), 2);
+assert_eq!(DbError::CATALOG[0].url().unwrap().to_string(), "https://docs.example.com/errors/DB-0001");
+
+// Any library can read the code through `&dyn Error`.
+let boxed: Box<dyn std::error::Error> = Box::new(err);
+assert_eq!(define_err::identify(&*boxed).unwrap().code, Some(DbError::TIMEOUT));
+```
+
+Codes, severity, kinds, and the catalog are constants: reading them costs a `match`, and nothing is allocated. Every mistake (a duplicate number, a code without help, a severity outside 1 to 24) is a compile error that says what to do.
+
 ## Scope
 
-The shape of the full Tier 1 API, with codes and metadata (`0.4.0`) and the reporting facade (`0.5.0`):
+The shape of the full Tier 1 API, with the reporting facade that arrives in `0.5.0`:
 
 ```rust
 use define_err::prelude::*;
@@ -112,7 +161,7 @@ define_err::warn("cache file is stale, rebuilding");  // once per call site
 | Part | Arrives in |
 |---|---|
 | `define_errors!`: enums and structs, messages, `source`, `From`, `transparent`, `#[non_exhaustive]` by default, `Secret<T>`, `Location` | `0.3.0` (shipped) |
-| Codes, the catalog, severity, categories, kinds, `ErrorInfo`, the identity probe | `0.4.0` |
+| Codes, the catalog, severity, categories, kinds, `ErrorInfo`, the identity probe | `0.4.0` (shipped) |
 | The reporting facade (`set_reporter`, `report`, `notice`, `warn`, `trigger`, `deprecated`, `soft`), `ErrorRecord`, test capture | `0.5.0` |
 
 Errors are values in Rust; there is no throw event. The facade sees an error only when code calls one of its verbs. It cannot see an error discarded with `let _ =`, `.ok()`, or `unwrap_or`, or a typed error that is built and never reported.

@@ -143,6 +143,21 @@ jobs:
         env:
           MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-disable-isolation"
 
+  fuzz:
+    name: Fuzz targets build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Build fuzz targets
+        # The prebuilt cargo-fuzz is a musl binary and would default to musl.
+        run: cargo fuzz build --target x86_64-unknown-linux-gnu
+        env:
+          RUSTFLAGS: ""
+
   package:
     name: Package
     runs-on: ubuntu-latest

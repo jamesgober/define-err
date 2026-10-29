@@ -13,6 +13,84 @@
 
 ---
 
+## [0.4.0] - 2026-10-29
+
+Codes and metadata.
+
+### Added
+
+- Codes: `Namespace` (1 to 6 characters, width 1 to 8 digits), `Code` (a
+  `NonZeroU64`, so `Option<Code>` is 8 bytes) with `new`, `namespace`,
+  `number`, `is_generic`, `as_u64`, `identity`, `from_u64`, `parse`,
+  `Display` (`DB-0042`), and ordering and hashing by identity, the width
+  ignored; `CodeParseError`, whose message never repeats the input;
+  `namespace!` and `code!` for constants checked at compile time.
+- `Severity` (OpenTelemetry 1 to 24, a `NonZeroU8`) with the named levels,
+  `at::<N>`, `new`, `saturating`, `band`, `otel_name`, `label`, `parse`;
+  `Band`; `LevelNames`.
+- `Category` (the 16 gRPC canonical codes without `OK`) with `http_status`,
+  `grpc_code`, `from_grpc`, `exit_code`, `is_transient`, `retry_advice`,
+  `may_retry_automatically`, default severity, action, and public message,
+  `name`, `parse`, and `from_io_kind`; `RetryAdvice`; `Action`.
+- `Kinds`: a 64-bit mask with 14 platform bits, 32 project bits
+  (`project::<N>`, `try_project`), set operations, `Display`, and an iterator.
+- `ErrorInfo` complete: `code`, `code_info`, `category`, `severity`,
+  `kinds`, `public_message`, `help`, `action`, `is_retryable`,
+  `retry_after`, with defaults; implemented for `std::io::Error` (with
+  `std`).
+- The catalog: `CodeInfo` (const `new` and `with_*`), `CodeState`
+  (`Active`, `Deprecated` with its replacement, `Retired`), `CodeInfo::url`
+  with `UrlDisplay`, `catalog::find`, `catalog::check_unique` and
+  `DuplicateCode`.
+- The identity probe: `identify`, `innermost_code`, and `Identity` read the
+  code, severity, category, kinds, and type name of a generated error held
+  as `&dyn Error`, with strict validation of every field.
+- `define_errors!`: the block header `namespace = "DB"` (with `width = N`),
+  `docs = "..."`, and `retired = [...]`, in any order; `#[code(n, name =
+  NAME, help = "...", title = "...", deprecated = "since", replacement =
+  n)]`; `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`, `#[action]`,
+  `#[retryable]`, `#[retry_after(secs = n)]`, and the `#[retry_after]` field
+  marker; generated code constants and `Type::CATALOG`; every `ErrorInfo`
+  method; the probe in `description()`. Transparent variants forward
+  metadata to the inner value, and fall back to their own when it has none.
+- Compile-time checks, each reported once: namespace and width, number
+  range, duplicates (retired numbers included, with rustc marking the second
+  literal), replacements, the docs placeholder, severity range, project bit
+  range, attribute order, repeated attributes, metadata on an enum, and type
+  names over 128 bytes. 48 compile-fail tests.
+- `prelude`: adds `Action`, `Category`, `Code`, `Kinds`, `Severity`.
+- Tests: golden files for code packing, probe strings, category tables,
+  severity names, and kind bits; property tests (proptest) for codes,
+  severity, kinds, and probes; edge cases E-33 to E-64 and E-87 to E-89;
+  the allocation check extended to codes and probes.
+- Fuzz targets `code_parse`, `code_from_u64`, `severity_parse`,
+  `category_parse`, and `probe_decode` (`fuzz/`), built in CI.
+
+### Generated code
+
+- New `__private` items: `namespace`, `namespace_or_placeholder`, `code`,
+  `code_or_placeholder`, `retired_code`, `severity`, `check_block`,
+  `check_docs`, `catalog_len`, `catalog`, `ProbeBuf`, `forward_probe`,
+  `description_of!`, `retry_after_of!`, the `DescribeVia*` and `RetryVia*`
+  dispatch traits, and the `platform_kinds` and `named_levels` modules.
+  Every type now implements every `ErrorInfo` method and `description()`.
+  `docs/GENERATED-CODE.md` describes each.
+
+### Changed
+
+- The probe carries the code's full value, width included, so an
+  identified code displays as it was defined (`DIS-00001`);
+  `tests/golden/probe.txt` updated before any release carried probes.
+- `docs/API.md`: the `#[code]` argument order, the deprecated note, the
+  `io::ErrorKind` mapping, the transparent fallback, and when a numeric
+  severity or project bit is checked.
+- `dev/ROADMAP.md`: a pre-1.0 polish pass in 0.9.x that revisits every
+  accepted gap, deferred item, and missed target, retunes performance, and
+  repeats the security and edge-case review; anything still open goes into
+  the 1.0 readiness note.
+
+---
+
 ## [0.3.0] - 2026-10-29
 
 The thiserror-parity core.
@@ -133,7 +211,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jamesgober/define-err/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/define-err/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/define-err/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/define-err/releases/tag/v0.1.0

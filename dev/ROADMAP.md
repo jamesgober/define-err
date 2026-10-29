@@ -37,13 +37,14 @@ Exit: page-db's test suite passes on a pilot branch with byte-identical messages
 - [x] Pilot migration of page-db in a scratch copy: all 65 tests and doctests pass, clippy and rustdoc clean, messages unchanged (D-031).
 - [x] Benchmark: `Display` and construction identical to thiserror and to hand-written code within noise (D-032).
 
-## v0.4.0 - Extended: codes and metadata
+## v0.4.0 - Extended: codes and metadata (DONE, 2026-10-29)
 API: DEF-13 to DEF-23, DEF-25, CODE-01 to CODE-09, SEV-01 to SEV-04, CAT-01 to CAT-07, KND-01 to KND-05, INF-01 (all methods) to INF-06, PRB-01 to PRB-03.
 Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; five-digit codes display as `DIS-00001`.
-- [ ] Code packing and parsing; fuzz targets `code_parse`, `code_from_u64` started.
-- [ ] Compile-time checks (7.13) with UI tests; the duplicate-span technique verified on stable and 1.81.
-- [ ] Category tables and kind bits locked against the golden files.
-- [ ] Edge cases E-33 to E-64, E-87 to E-89.
+- [x] Code packing and parsing; fuzz targets `code_parse`, `code_from_u64`, `severity_parse`, `category_parse`, `probe_decode`, each run 60 seconds with no finding (D-042).
+- [x] Compile-time checks (7.13) with UI tests, each mistake reported once (D-035); the duplicate-span technique verified on stable and 1.81.
+- [x] Category tables, severity names, kind bits, code packing, and probe strings locked against the golden files (`tests/golden.rs`).
+- [x] Edge cases E-33 to E-64, E-87 to E-89 (`tests/define_meta.rs`, `tests/edge_codes.rs`, unit tests, UI cases).
+- [x] Exit: the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; `DIS-00001` displays with five digits, also through the probe (D-033).
 
 ## v0.5.0 - Feature complete: facade and record
 API: FAC-01 to FAC-18, FAC-20, FAC-21, REC-01 to REC-07, TST-01, TST-02, DEF-24.
@@ -75,6 +76,11 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
 - [ ] Migrate noml-rust and mod-cli; config-lib's path decided with James (`PLAN.md` 19.4).
 - [ ] L2 builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite; L3 reads codes through the probe.
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.
+- [ ] **Pre-1.0 polish pass**, in `0.9.x` and before any 1.0 release candidate (James's standing rule: go back and fix any issues and tune performance before getting close to release):
+  - revisit every accepted gap, deferred item, known issue, and missed target recorded in `PLAN.md` section 20 and in this roadmap, and fix it or record why it stays;
+  - a fresh performance tuning pass against `PLAN.md` 11.1, with new measurements in `docs/PERFORMANCE.md`;
+  - re-run the security review (threats T1 to T17, attack tests, fuzz) and the edge-case review (E-1 to E-100 plus every case added since).
+  Nothing accepted earlier in the series becomes final silently: whatever is still open goes into the 1.0 readiness note for James.
 - [ ] Release candidates `0.9.x` until no API change is needed for two weeks of use.
 - [ ] `docs/STABILITY-1.0.md` drafted with the requirement-to-test map (`tests/TRACEABILITY.md`).
 

@@ -1,0 +1,15 @@
+error[E0080]: evaluation panicked: define_errors!: a code number must be from 0 to 16777215
+ --> tests/ui/code_macro_out_of_range.rs:2:13
+  |
+2 |     let _ = define_err::code!("DB", 16777216);
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `main::CODE` failed inside this call
+  |
+note: inside `define_err::__private::code`
+ --> $RUST/core/src/panic.rs
+  |
+  = note: the failure occurred here
+  |
+ ::: src/private.rs
+  |
+  |         None => panic!("define_errors!: a code number must be from 0 to 16777215"),
+  |                 ------------------------------------------------------------------ in this macro invocation
