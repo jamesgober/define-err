@@ -103,7 +103,7 @@ Costs are estimates (marked [est.]) until they are measured in `0.6.0`; measured
 
 ```toml
 [dependencies]
-define-err = "0.1.0"
+define-err = "0.2.0"
 ```
 
 ### Features
@@ -122,7 +122,7 @@ The crate is `#![no_std]`. `default-features = false` gives `core` only: every m
 
 ```toml
 [dependencies]
-define-err = { version = "0.1.0", default-features = false }
+define-err = { version = "0.2.0", default-features = false }
 ```
 
 MSRV is 1.81, the first release with `core::error::Error`.

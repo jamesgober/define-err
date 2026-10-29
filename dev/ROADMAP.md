@@ -16,7 +16,7 @@ Exit: CI green on every job; the crate published to claim the name.
 - [x] CI: Linux, macOS, Windows on x86_64 and aarch64, stable and 1.81, four feature modes; `no_std` cross-check job; Miri; package; security job (D-007).
 - [x] CI green on all 20 jobs, tagged `v0.1.0`, GitHub pre-release, published on crates.io (2026-10-23).
 
-## v0.2.0 - Design lock
+## v0.2.0 - Design lock (DONE, 2026-10-29)
 Exit: James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
 - [x] `docs/API.md` for every item in `PLAN.md` section 8 (signatures, errors, examples), each marked with the version it arrives in (2026-10-23).
 - [x] `docs/GENERATED-CODE.md`: the contract of `PLAN.md` 7.5 with full expansions for every form of 7.4 and the `__private` versioning rule, ready for the L2 owner (2026-10-23).
@@ -25,7 +25,7 @@ Exit: James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
 - [x] report-err's cross-crate requests decided: X-1 (D-008), X-7 (D-009), X-8 (D-010), X-9 (D-011) all accepted; X-12 stability (D-019).
 - [x] Simplicity review (standard 2.10): the Tier 1 example is one block plus two calls; verbs called by path, metadata through one prelude import (D-013).
 - [x] One new defence idea recorded (`PLAN.md` 10.2: error text never echoes rejected input, D-017).
-- [ ] James approves `docs/API.md` and `docs/GENERATED-CODE.md`.
+- [x] James approves `docs/API.md` and `docs/GENERATED-CODE.md` (2026-10-29, D-023).
 
 ## v0.3.0 - Core: thiserror parity
 API: DEF-01 to DEF-12, DEF-27, INF-01 (trait with defaults), INF-07, SEC-01 to SEC-03, ROOT-02, ROOT-03.

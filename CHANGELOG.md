@@ -11,7 +11,11 @@
 
 ## [Unreleased]
 
-The design lock. No functional code yet.
+---
+
+## [0.2.0] - 2026-10-29
+
+The design lock, approved by James. No functional code yet.
 
 ### Added
 
@@ -42,8 +46,9 @@ The design lock. No functional code yet.
   slot, all accepted); one error type `InstallError` for both write-once
   slots; verb macros called by path, not in the prelude; transparent
   variants forward the identity probe; a new defence idea.
-- `dev/ROADMAP.md`: 0.1.0 marked done; 0.5.0 lists the new items FAC-20,
-  FAC-21, and REC-07.
+- `dev/ROADMAP.md`: 0.1.0 and 0.2.0 marked done; 0.5.0 lists the new items
+  FAC-20, FAC-21, and REC-07.
+- README, crate documentation, and install snippets for 0.2.0.
 
 ---
 
@@ -75,5 +80,6 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jamesgober/define-err/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/jamesgober/define-err/releases/tag/v0.1.0

@@ -50,9 +50,10 @@
 //!
 //! ## Status
 //!
-//! Scaffold. The design and the version plan are in `dev/PLAN.md` and
-//! `dev/ROADMAP.md` in the [repository](https://github.com/jamesgober/define-err);
-//! the public API is written in `docs/API.md` at the `0.2.0` design lock. The
+//! Design lock. The public API of 1.0 is written in `docs/API.md` and what
+//! the macro expands to in `docs/GENERATED-CODE.md`; the design and the
+//! version plan are in `dev/PLAN.md` and `dev/ROADMAP.md` (all in the
+//! [repository](https://github.com/jamesgober/define-err)). The
 //! thiserror-parity core ships in `0.3.0`.
 
 #![no_std]
