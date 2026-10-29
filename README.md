@@ -32,7 +32,7 @@
         <strong>MSRV is 1.81+</strong> (Rust 2021 edition): the first release with <code>core::error::Error</code>.
     </p>
     <blockquote>
-        <strong>Status: scaffold (<code>0.1.0</code>).</strong> No functional code yet; this release claims the name. The design is in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a> and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>. The public API is written in <a href="./docs/API.md"><code>docs/API.md</code></a> at the <code>0.2.0</code> design lock, and the thiserror-parity core ships in <code>0.3.0</code>.
+        <strong>Status: design lock (<code>0.2.0</code>).</strong> No functional code yet. The complete public API is written and approved in <a href="./docs/API.md"><code>docs/API.md</code></a>, and what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>; the design is in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a> and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>. The thiserror-parity core ships in <code>0.3.0</code>.
     </blockquote>
 </div>
 
@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.1.0"
+define-err = "0.2.0"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.1.0", default-features = false }            # core only
-define-err = { version = "0.1.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.2.0", default-features = false }            # core only
+define-err = { version = "0.2.0", default-features = false, features = ["alloc"] }
 ```
 
 ## Scope

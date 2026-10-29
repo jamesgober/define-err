@@ -1,0 +1,26 @@
+# define-err golden file: severity (dev/PLAN.md 7.7, OpenTelemetry SeverityNumber). Frozen at 1.0.
+# columns: value	otel_name	label	display	band
+1	TRACE	TRACE	TRACE	Trace
+2	TRACE2	-	TRACE2	Trace
+3	TRACE3	-	TRACE3	Trace
+4	TRACE4	-	TRACE4	Trace
+5	DEBUG	DEBUG	DEBUG	Debug
+6	DEBUG2	-	DEBUG2	Debug
+7	DEBUG3	-	DEBUG3	Debug
+8	DEBUG4	-	DEBUG4	Debug
+9	INFO	INFO	INFO	Info
+10	INFO2	NOTICE	NOTICE	Info
+11	INFO3	-	INFO3	Info
+12	INFO4	-	INFO4	Info
+13	WARN	WARNING	WARNING	Warn
+14	WARN2	-	WARN2	Warn
+15	WARN3	-	WARN3	Warn
+16	WARN4	-	WARN4	Warn
+17	ERROR	ERROR	ERROR	Error
+18	ERROR2	-	ERROR2	Error
+19	ERROR3	-	ERROR3	Error
+20	ERROR4	CRITICAL	CRITICAL	Error
+21	FATAL	FATAL	FATAL	Fatal
+22	FATAL2	-	FATAL2	Fatal
+23	FATAL3	-	FATAL3	Fatal
+24	FATAL4	-	FATAL4	Fatal
