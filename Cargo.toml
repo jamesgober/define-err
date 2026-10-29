@@ -71,6 +71,11 @@ testing = ["std"]
 # DEV DEPENDENCIES
 # #################################
 [dev-dependencies]
+# The conformance suite compares every expressible thiserror case with the
+# same type written with `define_errors!` (dev/PLAN.md 12.1).
+thiserror = "2"
+# Compile-fail tests of the macro's error messages (tests/ui, stable only).
+trybuild = "1"
 
 
 # RELEASE PROFILE
