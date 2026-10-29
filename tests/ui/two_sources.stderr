@@ -1,0 +1,11 @@
+error: define_errors!: a variant has more than one source field; keep one `#[source]`, `#[from]`, or field named `source`
+ --> tests/ui/two_sources.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum E {
+5 | |         A { #[source] first: std::io::Error, #[source] second: std::fmt::Error } => "a",
+6 | |     }
+7 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_source` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

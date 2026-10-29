@@ -1,0 +1,11 @@
+error: define_errors!: a `#[from]` variant holds the source and, optionally, one `#[location]` field; move other fields to a variant without `#[from]`
+ --> tests/ui/from_with_extra_field.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum E {
+5 | |         A { #[from] source: std::io::Error, path: String } => "a {path}",
+6 | |     }
+7 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_from` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

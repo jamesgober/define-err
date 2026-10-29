@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.2.0"
+version = "0.3.0"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and
@@ -76,6 +76,15 @@ testing = ["std"]
 thiserror = "2"
 # Compile-fail tests of the macro's error messages (tests/ui, stable only).
 trybuild = "1"
+# Benchmarks against thiserror and hand-written impls (benches/).
+criterion = { version = "0.5", default-features = false }
+
+
+# BENCHMARKS
+# #################################
+[[bench]]
+name    = "definitions"
+harness = false
 
 
 # RELEASE PROFILE

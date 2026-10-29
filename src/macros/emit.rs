@@ -251,6 +251,9 @@ macro_rules! __define_err_transparent {
         };
         inner $( .or(::core::option::Option::Some(*$loc)) )?
     }};
+    (@default source []) => { ::core::option::Option::None };
+    (@default location []) => { ::core::option::Option::None };
+    (@default type_name [$($tname:tt)*]) => { $($tname)* };
     (@go type_name [$($tname:tt)*] $n:ident [$($loc:ident)?]) => {
         match $crate::__private::info_of!($n) {
             ::core::option::Option::Some(info) => $crate::ErrorInfo::type_name(info),
@@ -258,8 +261,13 @@ macro_rules! __define_err_transparent {
         }
     };
 
-    (@$what:ident [$($ctx:tt)*]; location $a:ident location $b:ident $($rest:tt)*) => {
+    // Shape errors are reported once, by the `Display` arm; the other
+    // methods expand to their defaults so the user sees one message.
+    (@fmt [$($ctx:tt)*]; location $a:ident location $b:ident $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: a variant has more than one `#[location]` field" }
+    };
+    (@$what:ident [$($ctx:tt)*]; location $a:ident location $b:ident $($rest:tt)*) => {
+        $crate::__define_err_transparent!(@default $what [$($ctx)*])
     };
     (@$what:ident [$($ctx:tt)*]; location $loc:ident $role:ident $n:ident) => {
         $crate::__define_err_transparent!(@go $what [$($ctx)*] $n [$loc])
@@ -267,14 +275,20 @@ macro_rules! __define_err_transparent {
     (@$what:ident [$($ctx:tt)*]; $role:ident $n:ident location $loc:ident) => {
         $crate::__define_err_transparent!(@go $what [$($ctx)*] $n [$loc])
     };
-    (@$what:ident [$($ctx:tt)*]; location $loc:ident) => {
+    (@fmt [$($ctx:tt)*]; location $loc:ident) => {
         ::core::compile_error! { "define_errors!: `transparent` needs a field to forward to besides the `#[location]` field" }
+    };
+    (@$what:ident [$($ctx:tt)*]; location $loc:ident) => {
+        $crate::__define_err_transparent!(@default $what [$($ctx)*])
     };
     (@$what:ident [$($ctx:tt)*]; $role:ident $n:ident) => {
         $crate::__define_err_transparent!(@go $what [$($ctx)*] $n [])
     };
-    (@$what:ident [$($ctx:tt)*]; $($roles:tt)*) => {
+    (@fmt [$($ctx:tt)*]; $($roles:tt)*) => {
         ::core::compile_error! { "define_errors!: `transparent` needs exactly one field, plus an optional `#[location]` field" }
+    };
+    (@$what:ident [$($ctx:tt)*]; $($roles:tt)*) => {
+        $crate::__define_err_transparent!(@default $what [$($ctx)*])
     };
 }
 

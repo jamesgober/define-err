@@ -1,0 +1,12 @@
+error: define_errors!: `#[exhaustive]` is written twice on one type
+ --> tests/ui/exhaustive_twice.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     #[exhaustive]
+5 | |     #[exhaustive]
+6 | |     pub enum E {
+... |
+9 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_type` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

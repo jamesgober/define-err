@@ -16,6 +16,27 @@ use crate::ErrorInfo;
 #[doc(hidden)]
 pub struct Wrap<'a, T: ?Sized>(pub &'a T);
 
+impl<T: ?Sized> Clone for Wrap<'_, T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: ?Sized> Copy for Wrap<'_, T> {}
+
+/// Implemented by every type a source field may have. Its only job is the
+/// compile error when a source field holds something that is not an error.
+#[doc(hidden)]
+#[diagnostic::on_unimplemented(
+    message = "define_errors!: `{Self}` is not an error type, so it cannot be the variant's source",
+    label = "this field is the source: it is named `source`, or marked `#[source]` or `#[from]`",
+    note = "a source must implement `core::error::Error`; rename the field, or remove `#[source]` or `#[from]`"
+)]
+pub trait SourceField {}
+
+impl<E: Error + ?Sized> SourceField for E {}
+
 /// `source()` for a field of type `E: Error + 'static`.
 #[doc(hidden)]
 pub trait SourceViaError<'a> {
@@ -86,6 +107,25 @@ impl<'a> SourceViaObject<'a> for &&Wrap<'a, alloc::boxed::Box<dyn Error + Send +
     #[inline]
     fn __define_err_source(&self) -> Option<&'a (dyn Error + 'static)> {
         Some(&**self.0)
+    }
+}
+
+/// The last resort, reached only when no impl above applies: the field is
+/// not an error, and the `SourceField` bound reports it in plain words.
+#[doc(hidden)]
+pub trait SourceViaNothing<'a, T> {
+    fn __define_err_source(self) -> Option<&'a (dyn Error + 'static)>
+    where
+        T: SourceField;
+}
+
+impl<'a, T> SourceViaNothing<'a, T> for Wrap<'a, T> {
+    #[inline]
+    fn __define_err_source(self) -> Option<&'a (dyn Error + 'static)>
+    where
+        T: SourceField,
+    {
+        None
     }
 }
 
@@ -164,7 +204,9 @@ impl<'a, T: ?Sized> InfoViaNothing<'a> for Wrap<'a, T> {
 macro_rules! __define_err_source_of {
     ($field:expr) => {{
         #[allow(unused_imports)]
-        use $crate::__private::{SourceViaError as _, SourceViaObject as _, SourceViaOption as _};
+        use $crate::__private::{
+            SourceViaError as _, SourceViaNothing as _, SourceViaObject as _, SourceViaOption as _,
+        };
         (&&&$crate::__private::Wrap($field)).__define_err_source()
     }};
 }

@@ -1,0 +1,11 @@
+error[E0425]: cannot find value `y` in this scope
+ --> tests/ui/message_unknown_field.rs:5:32
+  |
+5 |         A { x: u8 } => "value {y}",
+  |                                ^
+  |
+help: a local variable with a similar name exists
+  |
+5 -         A { x: u8 } => "value {y}",
+5 +         A { x: u8 } => "value {x}",
+  |
