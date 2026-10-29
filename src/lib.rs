@@ -109,27 +109,38 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod category;
+mod code;
 mod info;
+mod kinds;
 mod location;
 mod macros;
+mod probe;
 mod secret;
+mod severity;
 
 #[doc(hidden)]
 #[path = "private.rs"]
 pub mod __private;
 
 pub use crate::{
-    info::ErrorInfo,
+    category::{Action, Category, RetryAdvice},
+    code::{Code, CodeParseError, Namespace, NamespaceStr},
+    info::{catalog, CodeInfo, CodeState, ErrorInfo, UrlDisplay},
+    kinds::{Kinds, KindsIter},
     location::{here, Location},
+    probe::{identify, innermost_code, Identity},
     secret::Secret,
+    severity::{Band, LevelNames, Severity},
 };
 
 /// The one import a caller needs: `use define_err::prelude::*;`.
 ///
-/// Brings [`define_errors!`], [`ErrorInfo`] (the trait behind `.location()`,
-/// `.type_name()`, and, from `0.4.0`, `.code()` and `.category()`),
-/// [`Secret`], and [`Location`]. The reporting verbs (from `0.5.0`) are not
-/// in the prelude: they are called by path, `define_err::report(&err)`.
+/// Brings [`define_errors!`], [`ErrorInfo`] (the trait behind `.code()`,
+/// `.category()`, `.public_message()`, and the other metadata methods),
+/// [`Code`], [`Severity`], [`Category`], [`Kinds`], [`Action`], [`Secret`],
+/// and [`Location`]. The reporting verbs (from `0.5.0`) are not in the
+/// prelude: they are called by path, `define_err::report(&err)`.
 ///
 /// # Examples
 ///
@@ -143,7 +154,9 @@ pub use crate::{
 /// assert_eq!(Cancelled.type_name(), "Cancelled");
 /// ```
 pub mod prelude {
-    pub use crate::{define_errors, ErrorInfo, Location, Secret};
+    pub use crate::{
+        define_errors, Action, Category, Code, ErrorInfo, Kinds, Location, Secret, Severity,
+    };
 }
 
 /// Crate version string, populated by Cargo at build time.

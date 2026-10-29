@@ -233,9 +233,398 @@ macro_rules! __define_err_info_of {
     }};
 }
 
+// Codes, severity, kinds, the catalog, and the probe (0.4). The `const fn`s
+// that panic are called only from `const` items in generated code, so a
+// failure is a compile error, never a run-time panic (dev/PLAN.md 7.13).
+
+/// The block's namespace. Const evaluation only.
+#[doc(hidden)]
+#[allow(clippy::panic)]
+pub const fn namespace(text: &str, width: u8) -> crate::Namespace {
+    match crate::Namespace::try_with_width(text, width) {
+        Ok(namespace) => namespace,
+        Err(crate::CodeParseError::BadWidth) => {
+            panic!("define_errors!: width must be from 1 to 8 digits")
+        }
+        Err(_) => panic!(
+            "define_errors!: namespace must be 1 to 6 letters or digits, starting with a letter, for example \"DB\""
+        ),
+    }
+}
+
+/// A code constant. Const evaluation only.
+#[doc(hidden)]
+#[allow(clippy::panic)]
+pub const fn code(namespace: crate::Namespace, number: u32) -> crate::Code {
+    match namespace.code(number) {
+        Some(code) => code,
+        None => panic!("define_errors!: a code number must be from 0 to 16777215"),
+    }
+}
+
+/// A retired catalog entry. Const evaluation only.
+#[doc(hidden)]
+pub const fn retired_code(namespace: crate::Namespace, number: u32) -> crate::CodeInfo {
+    crate::CodeInfo::new(
+        code(namespace, number),
+        "retired",
+        "This code is retired and is never reused.",
+    )
+    .with_state(crate::CodeState::Retired)
+}
+
+/// A numeric severity, checked at compile time.
+#[doc(hidden)]
+pub const fn severity<const N: u8>() -> crate::Severity {
+    crate::Severity::at::<N>()
+}
+
+/// The block's checks: no number twice (retired numbers included), and every
+/// replacement names another code of the block. Const evaluation only.
+#[doc(hidden)]
+#[allow(clippy::panic)]
+pub const fn check_block(
+    duplicate_message: &str,
+    numbers: &[u32],
+    retired: &[u32],
+    replacements: &[&[(u32, u32)]],
+) {
+    let mut i = 0;
+    while i < numbers.len() {
+        let mut j = i + 1;
+        while j < numbers.len() {
+            if numbers[i] == numbers[j] {
+                panic!("{}", duplicate_message);
+            }
+            j += 1;
+        }
+        let mut k = 0;
+        while k < retired.len() {
+            if numbers[i] == retired[k] {
+                panic!("{}", duplicate_message);
+            }
+            k += 1;
+        }
+        i += 1;
+    }
+    let mut a = 0;
+    while a < retired.len() {
+        let mut b = a + 1;
+        while b < retired.len() {
+            if retired[a] == retired[b] {
+                panic!("{}", duplicate_message);
+            }
+            b += 1;
+        }
+        a += 1;
+    }
+    let mut r = 0;
+    while r < replacements.len() {
+        let mut p = 0;
+        while p < replacements[r].len() {
+            let (from, to) = replacements[r][p];
+            let mut found = false;
+            let mut n = 0;
+            while n < numbers.len() {
+                if numbers[n] == to {
+                    found = true;
+                }
+                n += 1;
+            }
+            if from == to || !found {
+                panic!("define_errors!: replacement must be another code defined in this block");
+            }
+            p += 1;
+        }
+        r += 1;
+    }
+}
+
+/// The docs template names at least one placeholder. Const evaluation only.
+#[doc(hidden)]
+#[allow(clippy::panic)]
+pub const fn check_docs(template: &str) {
+    let bytes = template.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'{'
+            && (starts_with(bytes, i, b"{code}")
+                || starts_with(bytes, i, b"{namespace}")
+                || starts_with(bytes, i, b"{number}"))
+        {
+            return;
+        }
+        i += 1;
+    }
+    panic!("define_errors!: the docs template needs {{code}}, {{namespace}}, or {{number}}");
+}
+
+/// Whether `bytes[at..]` starts with `prefix`.
+const fn starts_with(bytes: &[u8], at: usize, prefix: &[u8]) -> bool {
+    if bytes.len() - at < prefix.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < prefix.len() {
+        if bytes[at + i] != prefix[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// A placeholder entry for building catalog arrays; never seen by users.
+const PLACEHOLDER: crate::CodeInfo = retired_code(namespace("A", 4), 0);
+
+/// The number of entries in a type's catalog parts.
+#[doc(hidden)]
+pub const fn catalog_len(parts: &[&[crate::CodeInfo]]) -> usize {
+    let mut total = 0;
+    let mut i = 0;
+    while i < parts.len() {
+        total += parts[i].len();
+        i += 1;
+    }
+    total
+}
+
+/// A type's catalog from its per-variant parts (each empty or one entry).
+#[doc(hidden)]
+pub const fn catalog<const N: usize>(parts: &[&[crate::CodeInfo]]) -> [crate::CodeInfo; N] {
+    let mut out = [PLACEHOLDER; N];
+    let mut at = 0;
+    let mut i = 0;
+    while i < parts.len() {
+        let mut j = 0;
+        while j < parts[i].len() {
+            if at < N {
+                out[at] = parts[i][j];
+            }
+            at += 1;
+            j += 1;
+        }
+        i += 1;
+    }
+    out
+}
+
+/// Lowercase hex digits.
+const HEX: &[u8; 16] = b"0123456789abcdef";
+
+/// The probe string of one variant, built at compile time
+/// (`docs/GENERATED-CODE.md`, "The identity probe").
+#[doc(hidden)]
+pub struct ProbeBuf {
+    bytes: [u8; crate::probe::HEADER + crate::probe::MAX_NAME],
+    len: usize,
+}
+
+impl ProbeBuf {
+    /// Builds a probe. Const evaluation only.
+    #[allow(clippy::panic)]
+    pub const fn new(
+        code: Option<u64>,
+        severity: u8,
+        category: u8,
+        kinds: u64,
+        flags: u8,
+        name: &str,
+    ) -> ProbeBuf {
+        let mut bytes = [0_u8; crate::probe::HEADER + crate::probe::MAX_NAME];
+        let magic = crate::probe::MAGIC;
+        bytes[0] = magic[0];
+        bytes[1] = magic[1];
+        bytes[2] = magic[2];
+        bytes[3] = magic[3];
+        let mut i = 0;
+        while i < 16 {
+            bytes[4 + i] = match code {
+                Some(value) => HEX[((value >> (60 - 4 * i)) & 0xf) as usize],
+                None => b'x',
+            };
+            i += 1;
+        }
+        bytes[20] = HEX[(severity >> 4) as usize];
+        bytes[21] = HEX[(severity & 0xf) as usize];
+        bytes[22] = HEX[(category >> 4) as usize];
+        bytes[23] = HEX[(category & 0xf) as usize];
+        let mut k = 0;
+        while k < 16 {
+            bytes[24 + k] = HEX[((kinds >> (60 - 4 * k)) & 0xf) as usize];
+            k += 1;
+        }
+        bytes[40] = HEX[(flags >> 4) as usize];
+        bytes[41] = HEX[(flags & 0xf) as usize];
+        bytes[42] = b'|';
+        let name = name.as_bytes();
+        if name.is_empty() || name.len() > crate::probe::MAX_NAME {
+            panic!("define_errors!: a type or variant name is longer than 128 bytes");
+        }
+        let mut n = 0;
+        while n < name.len() {
+            bytes[crate::probe::HEADER + n] = name[n];
+            n += 1;
+        }
+        ProbeBuf { bytes, len: crate::probe::HEADER + name.len() }
+    }
+
+    /// The probe text. Const evaluation only.
+    #[allow(clippy::panic)]
+    pub const fn as_str(&self) -> &str {
+        match core::str::from_utf8(self.bytes.split_at(self.len).0) {
+            Ok(text) => text,
+            Err(_) => panic!("define_errors!: a type or variant name must be ASCII"),
+        }
+    }
+}
+
+/// The probe of a transparent variant: the inner value's when it has one,
+/// else the wrapper's own.
+#[doc(hidden)]
+#[inline]
+pub fn forward_probe<'a>(inner: &'a str, own: &'static str) -> &'a str {
+    if inner.as_bytes().starts_with(crate::probe::MAGIC) {
+        inner
+    } else {
+        own
+    }
+}
+
+/// The inner value's `description()`, for transparent variants.
+#[doc(hidden)]
+pub trait DescribeViaError<'a> {
+    fn __define_err_describe(&self) -> &'a str;
+}
+
+impl<'a, E: Error + 'a> DescribeViaError<'a> for Wrap<'a, E> {
+    #[inline]
+    #[allow(deprecated)]
+    fn __define_err_describe(&self) -> &'a str {
+        self.0.description()
+    }
+}
+
+/// The inner value's `description()` when it is a boxed trait object.
+#[doc(hidden)]
+pub trait DescribeViaObject<'a> {
+    fn __define_err_describe(&self) -> &'a str;
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> DescribeViaObject<'a> for &Wrap<'a, alloc::boxed::Box<dyn Error + 'static>> {
+    #[inline]
+    #[allow(deprecated)]
+    fn __define_err_describe(&self) -> &'a str {
+        (**self.0).description()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> DescribeViaObject<'a> for &Wrap<'a, alloc::boxed::Box<dyn Error + Send + 'static>> {
+    #[inline]
+    #[allow(deprecated)]
+    fn __define_err_describe(&self) -> &'a str {
+        (**self.0).description()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> DescribeViaObject<'a> for &Wrap<'a, alloc::boxed::Box<dyn Error + Send + Sync + 'static>> {
+    #[inline]
+    #[allow(deprecated)]
+    fn __define_err_describe(&self) -> &'a str {
+        (**self.0).description()
+    }
+}
+
+/// `retry_after` from a `#[retry_after]` field of type `Duration`.
+#[doc(hidden)]
+pub trait RetryViaDuration {
+    fn __define_err_retry(&self) -> Option<core::time::Duration>;
+}
+
+impl RetryViaDuration for Wrap<'_, core::time::Duration> {
+    #[inline]
+    fn __define_err_retry(&self) -> Option<core::time::Duration> {
+        Some(*self.0)
+    }
+}
+
+/// `retry_after` from a `#[retry_after]` field of type `Option<Duration>`.
+#[doc(hidden)]
+pub trait RetryViaOption {
+    fn __define_err_retry(&self) -> Option<core::time::Duration>;
+}
+
+impl RetryViaOption for &Wrap<'_, Option<core::time::Duration>> {
+    #[inline]
+    fn __define_err_retry(&self) -> Option<core::time::Duration> {
+        *self.0
+    }
+}
+
+/// Platform kind names for `#[kinds(...)]`.
+#[doc(hidden)]
+pub mod platform_kinds {
+    use crate::Kinds;
+
+    pub const ERROR: Kinds = Kinds::ERROR;
+    pub const WARNING: Kinds = Kinds::WARNING;
+    pub const NOTICE: Kinds = Kinds::NOTICE;
+    pub const DEPRECATED: Kinds = Kinds::DEPRECATED;
+    pub const SECURITY: Kinds = Kinds::SECURITY;
+    pub const FUTURE: Kinds = Kinds::FUTURE;
+    pub const RUNTIME: Kinds = Kinds::RUNTIME;
+    pub const RESOURCE: Kinds = Kinds::RESOURCE;
+    pub const CONFIG: Kinds = Kinds::CONFIG;
+    pub const USER: Kinds = Kinds::USER;
+    pub const PANIC: Kinds = Kinds::PANIC;
+    pub const AUDIT: Kinds = Kinds::AUDIT;
+    pub const TRIGGER: Kinds = Kinds::TRIGGER;
+}
+
+/// Severity names for `#[severity(...)]`.
+#[doc(hidden)]
+pub mod named_levels {
+    use crate::Severity;
+
+    pub const TRACE: Severity = Severity::TRACE;
+    pub const DEBUG: Severity = Severity::DEBUG;
+    pub const INFO: Severity = Severity::INFO;
+    pub const NOTICE: Severity = Severity::NOTICE;
+    pub const WARNING: Severity = Severity::WARNING;
+    pub const ERROR: Severity = Severity::ERROR;
+    pub const CRITICAL: Severity = Severity::CRITICAL;
+    pub const FATAL: Severity = Severity::FATAL;
+}
+
+/// The inner value's `description()`, for transparent variants.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __define_err_description_of {
+    ($field:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::__private::{DescribeViaError as _, DescribeViaObject as _};
+        (&&$crate::__private::Wrap($field)).__define_err_describe()
+    }};
+}
+
+/// `retry_after` from a `#[retry_after]` field.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __define_err_retry_after_of {
+    ($field:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::__private::{RetryViaDuration as _, RetryViaOption as _};
+        (&&$crate::__private::Wrap($field)).__define_err_retry()
+    }};
+}
+
 #[doc(hidden)]
 pub use crate::{
-    __define_err_forward_source as forward_source, __define_err_info_of as info_of,
+    __define_err_description_of as description_of, __define_err_forward_source as forward_source,
+    __define_err_info_of as info_of, __define_err_retry_after_of as retry_after_of,
     __define_err_source_of as source_of,
 };
 
