@@ -37,7 +37,7 @@ Exit: page-db's test suite passes on a pilot branch with byte-identical messages
 - [x] Pilot migration of page-db in a scratch copy: all 65 tests and doctests pass, clippy and rustdoc clean, messages unchanged (D-031).
 - [x] Benchmark: `Display` and construction identical to thiserror and to hand-written code within noise (D-032).
 
-## v0.4.0 - Extended: codes and metadata (DONE, 2026-10-29)
+## v0.4.0 - Extended: codes and metadata (DONE, 2026-11-02)
 API: DEF-13 to DEF-23, DEF-25, CODE-01 to CODE-09, SEV-01 to SEV-04, CAT-01 to CAT-07, KND-01 to KND-05, INF-01 (all methods) to INF-06, PRB-01 to PRB-03.
 Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; five-digit codes display as `DIS-00001`.
 - [x] Code packing and parsing; fuzz targets `code_parse`, `code_from_u64`, `severity_parse`, `category_parse`, `probe_decode`, each run 60 seconds with no finding (D-042).
