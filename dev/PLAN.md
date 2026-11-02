@@ -1171,7 +1171,7 @@ The event borrows everything and lives on the caller's stack for the duration of
 #### 7.14.7 Reentrancy and panics (`std`)
 
 - A thread-local flag marks "inside `receive`". A verb called on the same thread while the flag is set returns without delivering and increments `stats().reentrant_dropped`. Cost: one thread-local access, only after a reporter is installed.
-- `receive` runs inside `std::panic::catch_unwind(AssertUnwindSafe(...))`; a panic is caught, its payload dropped inside a second `catch_unwind` (dropping a payload can panic), and `stats().reporter_panics` incremented. Under `panic = "abort"` nothing can be caught, which `docs/FACADE.md` states.
+- `receive` runs inside `std::panic::catch_unwind(AssertUnwindSafe(...))`; a panic is caught, its payload dropped inside a second `catch_unwind` (dropping a payload can panic; a payload from that panic is dropped the same way, up to four times, and only one that keeps panicking leaks), and `stats().reporter_panics` incremented. Under `panic = "abort"` nothing can be caught, which `docs/FACADE.md` states.
 - Without `std` neither guard exists; the reporter contract forbids calling verbs from `receive` and forbids panicking, and `docs/FACADE.md` states it.
 
 #### 7.14.8 Ordering and memory model

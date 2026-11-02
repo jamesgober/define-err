@@ -6,8 +6,11 @@
 
 #[cfg(feature = "std")]
 mod imp {
-    use core::cell::Cell;
-    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use core::{any::Any, cell::Cell};
+    use std::{
+        boxed::Box,
+        panic::{catch_unwind, AssertUnwindSafe},
+    };
 
     use crate::facade::state;
 
@@ -35,13 +38,24 @@ mod imp {
         let _ = INSIDE.try_with(|flag| flag.set(false));
         if let Err(payload) = outcome {
             state::count_panic();
-            // Dropping a payload can itself panic. A second payload is not
-            // dropped: that could panic again, without end.
-            if let Err(second) = catch_unwind(AssertUnwindSafe(move || drop(payload))) {
-                state::count_panic();
-                core::mem::forget(second);
+            drop_payload(payload);
+        }
+    }
+
+    /// Drops a panic payload. Dropping one can itself panic, with a payload
+    /// of its own. Those are dropped too, up to a limit, so a payload that
+    /// keeps panicking leaks instead of looping forever.
+    fn drop_payload(mut payload: Box<dyn Any + Send>) {
+        for _ in 0..4 {
+            match catch_unwind(AssertUnwindSafe(move || drop(payload))) {
+                Ok(()) => return,
+                Err(next) => {
+                    state::count_panic();
+                    payload = next;
+                }
             }
         }
+        core::mem::forget(payload);
     }
 }
 
