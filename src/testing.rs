@@ -160,10 +160,17 @@ impl Drop for Restore {
 /// ```
 pub fn capture<R>(f: impl FnOnce() -> R) -> Result<(R, Vec<CapturedEvent>), InstallError> {
     if let Err(error) = set_reporter(&REPORTER) {
+        // The winner may still be between its claim and its publish, which
+        // takes a few instructions and cannot fail. Who won decides the
+        // outcome, so wait to see it.
+        let current = loop {
+            match reporter() {
+                Some(installed) => break installed,
+                None => std::thread::yield_now(),
+            }
+        };
         let ours: *const CaptureReporter = &REPORTER;
-        let current =
-            reporter().map(|installed| core::ptr::from_ref(installed).cast::<CaptureReporter>());
-        if current != Some(ours) {
+        if core::ptr::from_ref(current).cast::<CaptureReporter>() != ours {
             return Err(error);
         }
     }
