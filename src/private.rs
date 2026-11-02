@@ -445,12 +445,26 @@ pub const fn probe_len(name: &str, public: Option<&str>) -> usize {
     if name.is_empty() || name.len() > crate::probe::MAX_NAME {
         panic!("define_errors!: a type or variant name is longer than 128 bytes");
     }
+    if !name.is_ascii() {
+        panic!("define_errors!: a type or variant name must be ASCII");
+    }
     match public {
         Some(text) if text.len() > crate::probe::MAX_PUBLIC => {
             panic!("define_errors!: a public message is longer than 512 bytes")
         }
         Some(text) => crate::probe::HEADER + name.len() + 1 + text.len(),
         None => crate::probe::HEADER + name.len(),
+    }
+}
+
+/// The check `probe_len` makes of each name, for the plain arm of the emitter,
+/// whose probes are literals. Const evaluation only.
+#[doc(hidden)]
+pub const fn check_names(names: &[&str]) {
+    let mut i = 0;
+    while i < names.len() {
+        let _ = probe_len(names[i], None);
+        i += 1;
     }
 }
 
@@ -524,7 +538,7 @@ impl<const N: usize> ProbeBuf<N> {
     pub const fn as_str(&self) -> &str {
         match core::str::from_utf8(&self.bytes) {
             Ok(text) => text,
-            Err(_) => panic!("define_errors!: a type or variant name must be ASCII"),
+            Err(_) => panic!("define_errors!: a public message must be UTF-8"),
         }
     }
 }

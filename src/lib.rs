@@ -145,7 +145,7 @@
 //!
 //! ## Status
 //!
-//! `0.5.0`: feature complete. The public API of 1.0 is written in
+//! `0.6.0`: feature complete and measured. The public API of 1.0 is written in
 //! `docs/API.md` and what the macro expands to in `docs/GENERATED-CODE.md`
 //! (both in the [repository](https://github.com/jamesgober/define-err)).
 

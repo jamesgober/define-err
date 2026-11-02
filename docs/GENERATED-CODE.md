@@ -166,7 +166,7 @@ impl $crate::ErrorInfo for PageError {
 }
 ```
 
-(The `# _ =>` line marks an elision in this document; the real expansion lists every arm and has no catch-all.) A plain type's `source()` returns `None` from every arm, and its `ErrorInfo` impl overrides `location` (`None` from every arm) and `type_name`; every other method is the trait default (from `0.4`: `None`, `Category::Unknown`, `Severity::ERROR`, `Kinds::ERROR`, and so on). A format string that writes no field compiles to the same `write!` call; rustc turns a string with no arguments into a single `write_str`. The `description()` probe arrives in `0.4`; in `0.3` it is the standard library's default.
+(The `# _ =>` line marks an elision in this document; the real expansion lists every arm and has no catch-all.) A plain type's `source()` returns `None` from every arm, and its `ErrorInfo` impl overrides `retry_after`, `location` (`None` from every arm unless a field has the role), and `type_name`; every other method is the trait default (from `0.4`: `None`, `Category::Unknown`, `Severity::ERROR`, `Kinds::ERROR`, and so on). A format string that writes no field compiles to the same `write!` call; rustc turns a string with no arguments into a single `write_str`. The `description()` probe arrives in `0.4`; in `0.3` it is the standard library's default. From `0.6`, a type is plain when its block has no namespace and no variant has metadata or is transparent or takes format arguments; any other type gets a match in every method, as in expansion 3.
 
 An enum with zero variants generates `match *self {}` in `fmt`, `source`, `description`, and `type_name`.
 
@@ -693,7 +693,7 @@ DbError::Timeout     \0DE13b34a2f2600000011104000000000000000101|DbError::Timeou
 PageError::NotFound  \0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound
 ```
 
-The probe is built by `__private::ProbeBuf::new` in a `const` item, exactly `__private::probe_len(name, public)` bytes long, and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A type name longer than 128 bytes or a public message longer than 512 is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
+The probe is built by `__private::ProbeBuf::new` in a `const` item, exactly `__private::probe_len(name, public)` bytes long, and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A plain type's probes have the same bytes, written as `concat!` literals because they differ only in the name, and `__private::check_names` makes the same checks of every name in one `const` item (`0.6`). A type name longer than 128 bytes or a public message longer than 512 is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
 
 ## Compile-time checks
 
@@ -709,7 +709,7 @@ The rule: a `panic!` may only be reachable in constant evaluation, where it is a
 | docs template contains `{code}`, `{namespace}`, or `{number}` | `__private::check_docs` | "define_errors!: the docs template needs {code}, {namespace}, or {number}" |
 | severity number 1 to 24 | `__private::severity::<N>()`, through `Severity::at::<N>()` | "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)" |
 | project kind bit below 32 | `Kinds::project::<N>()` | "Kinds::project: the bit must be below 32" |
-| type name at most 128 bytes, ASCII | `__private::probe_len`, `ProbeBuf::as_str` | "define_errors!: a type or variant name is longer than 128 bytes" (or "... must be ASCII") |
+| type name at most 128 bytes, ASCII | `__private::probe_len` | "define_errors!: a type or variant name is longer than 128 bytes" (or "... must be ASCII") |
 | public message at most 512 bytes | `__private::probe_len` | "define_errors!: a public message is longer than 512 bytes" |
 
 `Severity::at::<N>()` and `Kinds::project::<N>()` check with an inline `const` block, which rustc evaluates when the function is monomorphized for a build. `cargo check` does not always reach that point; `cargo build` and `cargo test` do, and a use in a `const` item fails under `cargo check` too. Generated code uses both in `const` items.
@@ -748,7 +748,8 @@ Rules the macro itself rejects with `compile_error!` (each names the fix, and ea
 | `check_block` | `const fn check_block(duplicate_message: &str, numbers: &[u32], retired: &[u32], replacements: &[&[(u32, u32)]])` | duplicates and replacements; panics in const evaluation | 0.4 |
 | `catalog_len`, `catalog` | `const fn catalog_len(parts: &[&[CodeInfo]]) -> usize`; `const fn catalog<const N: usize>(parts: &[&[CodeInfo]]) -> [CodeInfo; N]` | build a type's `CATALOG` from per-variant parts | 0.4 |
 | `check_docs` | `const fn check_docs(template: &str)` | the docs template has a placeholder | 0.4 |
-| `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong name or public message | 0.5 |
+| `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong or non-ASCII name or an overlong public message | 0.5 |
+| `check_names` | `const fn check_names(names: &[&str])` | `probe_len`'s checks of a plain type's names | 0.6 |
 | `ProbeBuf` | `struct ProbeBuf<const N: usize>`; `const fn new(code: Option<u64>, severity: u8, category: u8, kinds: u64, transparent: bool, name: &str, public: Option<&str>) -> ProbeBuf<N>`; `const fn as_str(&self) -> &str` | builds the probe string at compile time (`0.4`; const-sized, with the public message, `0.5`) | 0.4 |
 | `forward_probe` | `fn forward_probe<'a>(inner: &'a str, own: &'static str) -> &'a str` | transparent variants | 0.4 |
 | `platform_kinds` | module of `Kinds` constants `ERROR` to `TRIGGER` | glob-imported where `#[kinds]` is expanded | 0.4 |

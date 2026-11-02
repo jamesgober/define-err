@@ -42,6 +42,16 @@ pub(crate) fn passes(_word: Word, _severity: Severity, _kinds: Kinds) -> bool {
 }
 
 #[inline]
+pub(crate) fn has_minimum(_word: Word) -> bool {
+    false
+}
+
+#[inline]
+pub(crate) fn below_minimum(_word: Word, _severity: Severity) -> bool {
+    false
+}
+
+#[inline]
 pub(crate) fn reporter(_word: Word) -> Option<&'static dyn Reporter> {
     None
 }

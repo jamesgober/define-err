@@ -51,10 +51,22 @@ pub(crate) fn mode(word: Word) -> WarnMode {
 /// everything, an event with no kinds included.
 #[inline]
 pub(crate) fn passes(word: Word, severity: Severity, kinds: Kinds) -> bool {
-    u32::from(severity.get()) >= word.min_severity() && {
+    !below_minimum(word, severity) && {
         let mask = kinds_mask();
         mask == Kinds::ALL || kinds.intersects(mask)
     }
+}
+
+/// Whether a minimum severity is set.
+#[inline]
+pub(crate) fn has_minimum(word: Word) -> bool {
+    word.min_severity() != 0
+}
+
+/// Whether the minimum drops this severity, whatever its kinds.
+#[inline]
+pub(crate) fn below_minimum(word: Word, severity: Severity) -> bool {
+    u32::from(severity.get()) < word.min_severity()
 }
 
 #[inline]

@@ -74,22 +74,20 @@ const fn valid_field(field: u32) -> bool {
     if field >= NAMESPACE_LIMIT {
         return false;
     }
-    let first = field / POWERS[0];
-    if first < 11 {
-        return false;
-    }
-    let mut padded = false;
-    let mut i = 1;
-    while i < 6 {
-        let value = (field / POWERS[i]) % 37;
-        if value == 0 {
-            padded = true;
-        } else if padded {
+    // Last character first, so each step divides by a constant.
+    let mut rest = field;
+    let mut text_ended = false;
+    let mut i = 0;
+    while i < 5 {
+        if rest % 37 != 0 {
+            text_ended = true;
+        } else if text_ended {
             return false;
         }
+        rest /= 37;
         i += 1;
     }
-    true
+    rest >= 11
 }
 
 /// The namespace of a code: one to six characters, `A` to `Z` and `0` to `9`,
@@ -182,13 +180,14 @@ impl Namespace {
     pub fn as_str(&self) -> NamespaceStr {
         let mut bytes = [0_u8; 6];
         let mut len = 0;
-        for (i, power) in POWERS.iter().enumerate() {
-            let value = (self.field / power) % 37;
-            if value == 0 {
-                break;
+        let mut rest = self.field;
+        for (i, byte) in bytes.iter_mut().enumerate().rev() {
+            let value = rest % 37;
+            rest /= 37;
+            if value != 0 {
+                *byte = value_char(value);
+                len = len.max(i + 1);
             }
-            bytes[i] = value_char(value);
-            len = i + 1;
         }
         NamespaceStr {
             bytes,
@@ -524,13 +523,29 @@ impl core::hash::Hash for Code {
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let namespace = self.namespace();
-        write!(
-            f,
-            "{}-{:0width$}",
-            &*namespace.as_str(),
-            self.number(),
-            width = usize::from(namespace.width)
-        )
+        let name = namespace.as_str();
+        // At most eight digits: a number fits 24 bits.
+        let mut digits = [b'0'; 8];
+        let mut first = digits.len() - usize::from(namespace.width);
+        let mut number = self.number();
+        for (index, digit) in digits.iter_mut().enumerate().rev() {
+            if number == 0 {
+                break;
+            }
+            *digit = b'0' + (number % 10) as u8;
+            number /= 10;
+            first = first.min(index);
+        }
+        let shown = &digits[first..];
+        let mut text = [b'-'; MAX_TEXT];
+        let (head, tail) = text.split_at_mut(usize::from(name.len) + 1);
+        head[..usize::from(name.len)].copy_from_slice(&name.bytes[..usize::from(name.len)]);
+        tail[..shown.len()].copy_from_slice(shown);
+        let len = head.len() + shown.len();
+        match core::str::from_utf8(&text[..len]) {
+            Ok(text) => f.write_str(text),
+            Err(_) => Err(fmt::Error),
+        }
     }
 }
 

@@ -196,3 +196,35 @@ fn test_record_allocation_count() {
     // The chain's vector, the message (it grows once), and the type name.
     assert_eq!(count, 4);
 }
+
+/// The count `docs/PERFORMANCE.md` publishes for a three-level chain.
+#[cfg(feature = "alloc")]
+#[test]
+fn test_record_allocation_count_three_levels() {
+    use std::fmt;
+
+    #[derive(Debug)]
+    struct Link(&'static str, Option<Box<Link>>);
+
+    impl fmt::Display for Link {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+
+    impl std::error::Error for Link {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.1.as_deref().map(|link| link as _)
+        }
+    }
+
+    let inner = Link("query timed out after 5000 ms", None);
+    let middle = Link("cannot write the page", Some(Box::new(inner)));
+    let err = Link("cannot save the document", Some(Box::new(middle)));
+    let mut record = None;
+    let count = allocations_during(|| record = Some(define_err::ErrorRecord::from_error(&err)));
+    assert_eq!(record.unwrap().chain.len(), 3);
+    // The chain's vector, its one growth, and each message; these entries have
+    // no type name to copy.
+    assert_eq!(count, 7);
+}
