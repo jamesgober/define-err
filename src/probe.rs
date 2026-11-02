@@ -15,6 +15,9 @@
 //! 40      2       flags in lowercase hex: bit 0 public message, bit 1 transparent
 //! 42      1       '|'
 //! 43      1-128   type name, ASCII
+//! then, only when flag bit 0 is set:
+//!         1       '|'
+//!         0-512   the public message, UTF-8
 //! ```
 
 use core::error::Error;
@@ -27,6 +30,8 @@ pub(crate) const MAGIC: &[u8; 4] = b"\0DE1";
 pub(crate) const HEADER: usize = 43;
 /// The longest type name a probe carries.
 pub(crate) const MAX_NAME: usize = 128;
+/// The longest public message a probe carries.
+pub(crate) const MAX_PUBLIC: usize = 512;
 
 /// What a probe says about an error.
 ///
@@ -67,6 +72,8 @@ pub struct Identity<'a> {
     /// Whether the variant wrote its own public message (otherwise the
     /// category's default applies).
     pub has_public: bool,
+    /// The variant's own `#[public]` message, if it wrote one.
+    pub public: Option<&'a str>,
     /// Whether this is a transparent wrapper whose inner value has no probe.
     pub transparent: bool,
     /// `"Type::Variant"`, or `"Type"` for a struct.
@@ -95,6 +102,53 @@ pub fn identify<'a>(error: &'a (dyn Error + 'static)) -> Option<Identity<'a>> {
     #[allow(deprecated)]
     let text = error.description();
     decode(text)
+}
+
+/// What the facade and `ErrorRecord` use of an error held as `&dyn Error`.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Facts<'a> {
+    pub(crate) code: Option<Code>,
+    pub(crate) severity: Severity,
+    pub(crate) category: Category,
+    pub(crate) kinds: Kinds,
+    pub(crate) type_name: Option<&'a str>,
+    #[cfg_attr(not(feature = "alloc"), allow(dead_code))]
+    pub(crate) public: Option<&'a str>,
+}
+
+/// The facts of `error`: from its probe; a foreign error is `ERROR` with
+/// category `Unknown`, except a `std::io::Error`, the one built-in fallback.
+pub(crate) fn facts<'a>(error: &'a (dyn Error + 'static)) -> Facts<'a> {
+    if let Some(identity) = identify(error) {
+        return Facts {
+            code: identity.code,
+            severity: identity.severity,
+            category: identity.category,
+            kinds: identity.kinds,
+            type_name: Some(identity.type_name),
+            public: identity.public,
+        };
+    }
+    #[cfg(feature = "std")]
+    if let Some(io) = error.downcast_ref::<std::io::Error>() {
+        use crate::ErrorInfo;
+        return Facts {
+            code: None,
+            severity: Severity::ERROR,
+            category: io.category(),
+            kinds: io.kinds(),
+            type_name: Some(io.type_name()),
+            public: None,
+        };
+    }
+    Facts {
+        code: None,
+        severity: Severity::ERROR,
+        category: Category::Unknown,
+        kinds: Kinds::ERROR,
+        type_name: None,
+        public: None,
+    }
 }
 
 /// Walks `source()` from `error` and returns the last (innermost) entry that
@@ -162,7 +216,10 @@ fn hex(bytes: &[u8]) -> Option<u64> {
 /// Decodes a probe string; `None` unless every field is valid.
 pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
     let bytes = text.as_bytes();
-    if bytes.len() <= HEADER || bytes.len() > HEADER + MAX_NAME || &bytes[..4] != MAGIC {
+    if bytes.len() <= HEADER
+        || bytes.len() > HEADER + MAX_NAME + 1 + MAX_PUBLIC
+        || &bytes[..4] != MAGIC
+    {
         return None;
     }
     let code = match &bytes[4..20] {
@@ -176,8 +233,18 @@ pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
     if flags > 0b11 || bytes[42] != b'|' {
         return None;
     }
-    let name = &bytes[HEADER..];
-    if !name.iter().all(u8::is_ascii_graphic) {
+    // Byte 42 is ASCII, so `HEADER` is a character boundary.
+    let (type_name, public) = if flags & 1 != 0 {
+        let (name, public) = text[HEADER..].split_once('|')?;
+        (name, Some(public))
+    } else {
+        (&text[HEADER..], None)
+    };
+    if type_name.is_empty()
+        || type_name.len() > MAX_NAME
+        || !type_name.bytes().all(|byte| byte.is_ascii_graphic())
+        || public.is_some_and(|text| text.len() > MAX_PUBLIC)
+    {
         return None;
     }
     Some(Identity {
@@ -185,9 +252,10 @@ pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
         severity,
         category,
         kinds,
-        has_public: flags & 1 != 0,
+        has_public: public.is_some(),
+        public,
         transparent: flags & 2 != 0,
-        type_name: &text[HEADER..],
+        type_name,
     })
 }
 
@@ -198,18 +266,21 @@ mod tests {
 
     #[test]
     fn test_decode_golden_probes() {
-        let id = decode("\0DE13b34a2f2600000011104000000000000000101|DbError::Timeout").unwrap();
+        let id = decode("\0DE13b34a2f2600000011104000000000000000101|DbError::Timeout|Try later.")
+            .unwrap();
         assert_eq!(id.code.map(|c| c.number()), Some(1));
         assert_eq!(id.severity, Severity::ERROR);
         assert_eq!(id.category, Category::DeadlineExceeded);
         assert_eq!(id.kinds, Kinds::ERROR);
         assert!(id.has_public && !id.transparent);
+        assert_eq!(id.public, Some("Try later."));
         assert_eq!(id.type_name, "DbError::Timeout");
 
         let plain =
             decode("\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound").unwrap();
         assert!(plain.code.is_none());
         assert_eq!(plain.category, Category::Unknown);
+        assert_eq!(plain.public, None);
     }
 
     #[test]
@@ -233,6 +304,8 @@ mod tests {
             "\0DE1xxxxxxxxxxxxxxxX1102000000000000000100|T",
             "\0DE13b34a2f2610000011102000000000000000100|T",
             "\0DE10000000000000000011102000000000000000100|T",
+            "\0DE1xxxxxxxxxxxxxxxx1102000000000000000101|T",
+            "\0DE1xxxxxxxxxxxxxxxx1102000000000000000101||text",
         ];
         for case in cases {
             assert!(decode(case).is_none(), "{case:?}");
@@ -245,6 +318,15 @@ mod tests {
         probe.push_str(&"N".repeat(128));
         assert!(decode(&probe).is_some());
         probe.push('N');
+        assert!(decode(&probe).is_none());
+    }
+
+    #[test]
+    fn test_decode_public_length_limit() {
+        let mut probe = std::string::String::from("\0DE1xxxxxxxxxxxxxxxx1102000000000000000101|T|");
+        probe.push_str(&"p".repeat(512));
+        assert_eq!(decode(&probe).unwrap().public.map(str::len), Some(512));
+        probe.push('p');
         assert!(decode(&probe).is_none());
     }
 

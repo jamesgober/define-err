@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.4.0"
+version = "0.5.0"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and
@@ -80,6 +80,25 @@ trybuild = "1"
 criterion = { version = "0.5", default-features = false }
 # Property tests of every invariant (round trips, set laws, "never panics").
 proptest = { version = "1", default-features = false, features = ["std"] }
+
+
+# Exhaustive models of the facade's atomics (tests/loom.rs), built only with
+# `--cfg loom`.
+[target.'cfg(loom)'.dev-dependencies]
+loom = "0.7"
+
+
+# LINTS
+# #################################
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(loom)"] }
+
+
+# EXAMPLES
+# #################################
+[[example]]
+name              = "facade"
+required-features = ["alloc"]
 
 
 # BENCHMARKS

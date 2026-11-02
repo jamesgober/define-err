@@ -438,26 +438,42 @@ pub const fn catalog<const N: usize>(parts: &[&[crate::CodeInfo]]) -> [crate::Co
 /// Lowercase hex digits.
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
-/// The probe string of one variant, built at compile time
-/// (`docs/GENERATED-CODE.md`, "The identity probe").
+/// The length of one variant's probe string. Const evaluation only.
 #[doc(hidden)]
-pub struct ProbeBuf {
-    bytes: [u8; crate::probe::HEADER + crate::probe::MAX_NAME],
-    len: usize,
+#[allow(clippy::panic)]
+pub const fn probe_len(name: &str, public: Option<&str>) -> usize {
+    if name.is_empty() || name.len() > crate::probe::MAX_NAME {
+        panic!("define_errors!: a type or variant name is longer than 128 bytes");
+    }
+    match public {
+        Some(text) if text.len() > crate::probe::MAX_PUBLIC => {
+            panic!("define_errors!: a public message is longer than 512 bytes")
+        }
+        Some(text) => crate::probe::HEADER + name.len() + 1 + text.len(),
+        None => crate::probe::HEADER + name.len(),
+    }
 }
 
-impl ProbeBuf {
-    /// Builds a probe. Const evaluation only.
-    #[allow(clippy::panic)]
+/// The probe string of one variant, built at compile time and exactly as long
+/// as it needs to be (`docs/GENERATED-CODE.md`, "The identity probe").
+#[doc(hidden)]
+pub struct ProbeBuf<const N: usize> {
+    bytes: [u8; N],
+}
+
+impl<const N: usize> ProbeBuf<N> {
+    /// Builds a probe of `probe_len(name, public)` bytes. Const evaluation
+    /// only. `transparent` is the flag bit; the public bit follows `public`.
     pub const fn new(
         code: Option<u64>,
         severity: u8,
         category: u8,
         kinds: u64,
-        flags: u8,
+        transparent: bool,
         name: &str,
-    ) -> ProbeBuf {
-        let mut bytes = [0_u8; crate::probe::HEADER + crate::probe::MAX_NAME];
+        public: Option<&str>,
+    ) -> ProbeBuf<N> {
+        let mut bytes = [0_u8; N];
         let magic = crate::probe::MAGIC;
         bytes[0] = magic[0];
         bytes[1] = magic[1];
@@ -480,28 +496,33 @@ impl ProbeBuf {
             bytes[24 + k] = HEX[((kinds >> (60 - 4 * k)) & 0xf) as usize];
             k += 1;
         }
-        bytes[40] = HEX[(flags >> 4) as usize];
-        bytes[41] = HEX[(flags & 0xf) as usize];
+        let flags = public.is_some() as u8 | (transparent as u8) << 1;
+        bytes[40] = b'0';
+        bytes[41] = HEX[flags as usize];
         bytes[42] = b'|';
         let name = name.as_bytes();
-        if name.is_empty() || name.len() > crate::probe::MAX_NAME {
-            panic!("define_errors!: a type or variant name is longer than 128 bytes");
-        }
         let mut n = 0;
         while n < name.len() {
             bytes[crate::probe::HEADER + n] = name[n];
             n += 1;
         }
-        ProbeBuf {
-            bytes,
-            len: crate::probe::HEADER + name.len(),
+        if let Some(text) = public {
+            let text = text.as_bytes();
+            let start = crate::probe::HEADER + name.len() + 1;
+            bytes[start - 1] = b'|';
+            let mut t = 0;
+            while t < text.len() {
+                bytes[start + t] = text[t];
+                t += 1;
+            }
         }
+        ProbeBuf { bytes }
     }
 
     /// The probe text. Const evaluation only.
     #[allow(clippy::panic)]
     pub const fn as_str(&self) -> &str {
-        match core::str::from_utf8(self.bytes.split_at(self.len).0) {
+        match core::str::from_utf8(&self.bytes) {
             Ok(text) => text,
             Err(_) => panic!("define_errors!: a type or variant name must be ASCII"),
         }
@@ -627,6 +648,8 @@ pub mod named_levels {
     pub const CRITICAL: Severity = Severity::CRITICAL;
     pub const FATAL: Severity = Severity::FATAL;
 }
+
+pub use crate::facade::{deprecated_site, notice_args, trigger_args, warn_ready, warn_site, Site};
 
 /// The inner value's `description()`, for transparent variants.
 #[doc(hidden)]

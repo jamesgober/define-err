@@ -243,10 +243,15 @@ fn test_identify_reads_every_generated_variant() {
     assert_eq!(id.category, Category::DataLoss);
     assert_eq!(id.kinds, Kinds::ERROR | Kinds::SECURITY);
     assert!(!id.has_public);
+    assert_eq!(id.public, None);
     assert_eq!(id.type_name, "DbError::Corrupt");
 
     let timeout = identify(&DbError::Timeout { after_ms: 1 }).unwrap();
     assert!(timeout.has_public);
+    assert_eq!(
+        timeout.public,
+        Some("The database is busy. Try again shortly.")
+    );
     assert!(identify(&PlanError::Uncoded).unwrap().code.is_none());
     assert!(identify(&std::fmt::Error).is_none());
 }

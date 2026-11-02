@@ -1,0 +1,10 @@
+error: format argument must be a string literal
+ --> tests/ui/verb_format_not_literal.rs:3:25
+  |
+3 |     define_err::notice!(text);
+  |                         ^^^^
+  |
+help: you might be missing a string literal to format with
+  |
+3 |     define_err::notice!("{}", text);
+  |                         +++++

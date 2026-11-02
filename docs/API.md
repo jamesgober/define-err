@@ -103,7 +103,7 @@ Costs are estimates (marked [est.]) until they are measured in `0.6.0`; measured
 
 ```toml
 [dependencies]
-define-err = "0.4.0"
+define-err = "0.5.0"
 ```
 
 ### Features
@@ -122,7 +122,7 @@ The crate is `#![no_std]`. `default-features = false` gives `core` only: every m
 
 ```toml
 [dependencies]
-define-err = { version = "0.4.0", default-features = false }
+define-err = { version = "0.5.0", default-features = false }
 ```
 
 MSRV is 1.81, the first release with `core::error::Error`.
@@ -199,7 +199,7 @@ A plain error type needs only the first line of the block's body; everything els
 
 ## `define_errors!`
 
-Since `0.3` (DEF-01 to DEF-12, DEF-27); codes and metadata `0.4` (DEF-13 to DEF-23, DEF-25); `#[cfg]` on variants `0.5` (DEF-24).
+Since `0.3` (DEF-01 to DEF-12, DEF-27); codes and metadata `0.4` (DEF-13 to DEF-23, DEF-25); `#[cfg]` on variants and fields `0.5` (DEF-24).
 
 ```rust
 #[macro_export]
@@ -569,8 +569,31 @@ Misuse is a compile error that names the problem and the fix. Each has a `trybui
 | `replacement` pointing at itself or outside the block | "replacement must be another code defined in this block" |
 | `#[exhaustive]` on a struct | "`#[exhaustive]` applies only to enums" |
 | a variant or type name longer than 128 bytes | "a type or variant name is longer than 128 bytes" |
+| a `#[public]` message longer than 512 bytes | "a public message is longer than 512 bytes" |
+| `#[cfg]` on a tuple field or a marked field | "`#[cfg]` works on the fields of braced variants and structs" / "`#[cfg]` works on plain fields" |
 
 Each mistake is reported once, at the place it was written. A numeric severity or project kind bit used outside the macro (`Severity::at::<30>()`, `Kinds::project::<40>()` in a function body) is checked when the function is built: `cargo build` and `cargo test` reject it, `cargo check` may not. In a `const` item both reject it.
+
+### `#[cfg]` on variants and fields
+
+`#[cfg]` on a variant, or on a plain field of a braced variant or struct, compiles that part in or out with your own features. Every generated arm, `From` impl, catalog entry, and check follows it, so two variants with the same number under exclusive conditions are fine.
+
+```rust
+define_errors! {
+    namespace = "NET";
+
+    pub enum NetError {
+        #[code(1, help = "Check the address.")]
+        Refused => "connection refused",
+
+        #[cfg(feature = "tls")]
+        #[code(2, help = "Check the certificate.")]
+        Tls { alert: u8 } => "tls alert {alert}",
+    }
+}
+```
+
+A message must not name a field that can be compiled out. `#[cfg]` is a compile error on a tuple field (a pattern has no place for it) and on a field marked `#[from]`, `#[source]`, `#[location]`, or `#[retry_after]` (generated code reads that field). This is the one place a `cfg` appears in generated code, and it is always copied from your input.
 
 ### Limits
 
@@ -1322,12 +1345,13 @@ pub struct Identity<'a> {
     pub category: Category,
     pub kinds: Kinds,
     pub has_public: bool,
+    pub public: Option<&'a str>,
     pub transparent: bool,
     pub type_name: &'a str,
 }
 ```
 
-`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`DIS-00001`, not `DIS-0001`).
+`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message, and `public` is that text (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`DIS-00001`, not `DIS-0001`).
 
 ## `Secret<T>`
 
@@ -1561,7 +1585,8 @@ A warning: kinds `WARNING`, severity `WARNING` (13). By default each call site d
 
 - `warn!` keeps one `AtomicBool` at its call site: exact, for any number of sites [est. under 2 ns after the first delivery].
 - `warn()` (a function cannot own a static per call site) keeps a fixed, lock-free table of 512 sites keyed by a hash of the caller's file, line, and column [est. under 5 ns after the first delivery]. When more than 512 distinct sites have warned, the extra sites deliver every time and `stats().site_table_overflow` counts it: a warning is never lost to the table.
-- A warning issued before a reporter is installed does not use up its site: it is delivered the first time it happens after installation.
+- A warning issued before a reporter is installed does not use up its site: it is delivered the first time it happens after installation. The same goes for a warning dropped by a filter or by the `Ignore` mode: a site is marked only when the warning reaches the reporter.
+- After a `warn!` site has delivered, its arguments are no longer evaluated, and the macros evaluate nothing when no reporter is installed.
 
 ```rust
 fn parse_port(text: &str) -> u16 {
@@ -1608,7 +1633,7 @@ macro_rules! deprecated {
 }
 ```
 
-A run-time deprecation warning for anything that is not a Rust item (a configuration key, a protocol field, an API endpoint): kinds `DEPRECATED | WARNING`, severity `WARNING`, once per call site like `warn`. The message is "`<item>` is deprecated[ since <since>][; use <replacement> instead]". Rust items use `#[deprecated]` instead; deprecated codes are marked in the catalog.
+A run-time deprecation warning for anything that is not a Rust item (a configuration key, a protocol field, an API endpoint): kinds `DEPRECATED | WARNING`, severity `WARNING`, once per call site like `warn`. The message is "`<item>` is deprecated[ since <since>][; use <replacement> instead]", backticks included. Rust items use `#[deprecated]` instead; deprecated codes are marked in the catalog.
 
 ```rust
 if config.contains("pool.max") {
@@ -1656,7 +1681,7 @@ pub fn kinds_mask() -> Kinds;
 | `Ignore` | | warnings are dropped; `report`, `notice`, and `trigger` are unaffected |
 | `Error` | | as `Once`, and `soft` returns `Err` |
 | minimum severity | `None` (everything) | events below it are dropped before the event is built or anything is formatted |
-| kinds mask | `Kinds::ALL` | events with no kind in the mask are dropped the same way |
+| kinds mask | `Kinds::ALL` | events with no kind in the mask are dropped the same way; `ALL` passes everything, an event with no kinds included |
 
 These are process-wide settings for the facade's own prefilter, set by the application (or by the error service from its configuration). Per-listener filtering, storm control, and per-code policy belong to the error service.
 
@@ -1674,6 +1699,9 @@ define_err::set_kinds_mask(Kinds::ALL - Kinds::DEPRECATED); // nobody here acts 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[non_exhaustive]
 pub enum Verb { Report, Notice, Warn, Trigger, Deprecated, Soft }
+impl Verb {
+    pub const fn name(self) -> &'static str;    // "report", "notice", ...
+}
 
 #[derive(Clone, Copy)]
 #[non_exhaustive]
@@ -1702,7 +1730,7 @@ impl<'a> Event<'a> {
     #[cfg(feature = "alloc")]
     pub fn with_record(self, record: &'a ErrorRecord) -> Event<'a>;
 }
-impl core::fmt::Debug for Event<'_>;
+impl core::fmt::Debug for Event<'_>;      // the plain facts; never runs a user's Display
 ```
 
 What a reporter receives. Everything is borrowed and lives on the caller's stack for the length of `receive`. `error()` is set for `report`, `report_with`, and `soft`; `message()` for `notice`, `warn`, `trigger`, and `deprecated`; `record()` for `report_record` (whose verb is `Report`). `type_name()` comes from the probe or the record. The `new` and `with_*` methods (Tier 3) let a reporter's tests and the error service build events; `new` starts from kinds `NONE`, severity `ERROR`, no code, category `Unknown`.
@@ -1821,10 +1849,10 @@ impl core::fmt::Display for ErrorRecord;   // "[DB-0001] query timed out after 5
 | `trail` | locations: where the error was created, converted, given context, reported |
 | `backtrace` | text, filled by the dynamic-error or service library |
 | `event_id`, `time_unix_nanos` | filled by the error service (there is no clock in `no_std`) |
-| `handled` | whether the error was handled (OpenTelemetry's distinction for severities) |
+| `handled` | whether the error was handled (OpenTelemetry's distinction for severities); `true` unless a caller says otherwise |
 | `truncated` | a limit was hit somewhere |
 
-`Display` writes one line (`[code] outer message: caused by inner message ...`); every other format belongs to the render library. The limits the record was built with are kept with it (not a public field), so later additions stay inside the same bounds.
+`Display` writes one line (`[code] outer message: caused by inner message ...`), with control characters as spaces; every other format belongs to the render library. The limits the record was built with are kept with it (not a public field), so later additions stay inside the same bounds.
 
 ### Building a record
 
@@ -1839,7 +1867,7 @@ impl ErrorRecord {
 }
 ```
 
-- `from_error` walks `source()` up to `max_chain` entries, writes each `Display` through a bounded writer that stops at `max_message_bytes` (cut on a character boundary), and reads each entry's identity with [`identify`](#identify). A `Display` that returns `fmt::Error` is stored as `"<message unavailable>"`. A `source()` that returns itself stops at the limit.
+- `from_error` walks `source()` up to `max_chain` entries, writes each `Display` through a bounded writer that stops at `max_message_bytes` (cut on a character boundary), and reads each entry's identity with [`identify`](#identify). An entry without a probe has the type name `"unknown"`. A `Display` that returns `fmt::Error` is stored as `"<message unavailable>"`. A `source()` that returns itself stops at the limit.
 - `from_event` adds the event's location to the trail and its message; an event without an error (a notice) becomes one synthetic chain entry with type name `"notice"` (and likewise for the other verbs). An event that carries a record returns a clone of it with the event's location added.
 - `new` starts an empty record for a caller that assembles the chain itself (a dynamic error type that renders its own chain through a guarded writer and adds sections, fields, and a trail that `source()` does not expose); `public` is the category's default message. `with_limits` replaces the default limits before anything is added.
 
@@ -1966,14 +1994,14 @@ pub mod testing {
         pub record: Option<ErrorRecord>,
     }
 
-    pub struct CaptureReporter;
+    pub struct CaptureReporter { /* private */ }
     impl Reporter for CaptureReporter;
 }
 ```
 
 `capture` runs `f` and returns its result with every event the facade delivered on this thread while `f` ran. It installs `CaptureReporter` on first use; the reporter routes each event to a buffer of the thread that raised it, so tests running in parallel never see each other's events. `message` is the formatted message, or the error's `Display` for error events; `record` is filled for error events.
 
-If a different reporter is already installed, `capture` returns `Err(InstallError)` instead of running `f`: a test cannot capture what goes to someone else's reporter, and an empty or partial list must never pass as the real one.
+If a different reporter is already installed, `capture` returns `Err(InstallError)` instead of running `f`: a test cannot capture what goes to someone else's reporter, and an empty or partial list must never pass as the real one. Warn sites are process-wide, so a site that fired in one test stays silent in the next. Nested captures each keep their own list.
 
 ```rust
 use define_err::testing::capture;

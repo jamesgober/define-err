@@ -32,7 +32,7 @@
         <strong>MSRV is 1.81+</strong> (Rust 2021 edition): the first release with <code>core::error::Error</code>.
     </p>
     <blockquote>
-        <strong>Status: codes and metadata (<code>0.4.0</code>).</strong> <code>define_errors!</code> has thiserror parity (messages, sources, <code>From</code>, <code>transparent</code>, structs, <code>#[non_exhaustive]</code> by default, <code>Secret&lt;T&gt;</code>, locations) and optional codes, a compile-time catalog, severity, categories, kinds, public messages, retry advice, and the identity probe. The reporting facade arrives in <code>0.5.0</code>. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
+        <strong>Status: feature complete (<code>0.5.0</code>).</strong> <code>define_errors!</code> has thiserror parity and optional codes, a compile-time catalog, severity, categories, kinds, public messages, and retry advice. The reporting facade, <code>ErrorRecord</code>, and test capture are in. The releases before 1.0 are for tuning, hardening, and migrating real crates. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
     </blockquote>
 </div>
 
@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.4.0"
+define-err = "0.5.0"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.4.0", default-features = false }            # core only
-define-err = { version = "0.4.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.5.0", default-features = false }            # core only
+define-err = { version = "0.5.0", default-features = false, features = ["alloc"] }
 ```
 
 ## Quick start
@@ -129,40 +129,46 @@ assert_eq!(define_err::identify(&*boxed).unwrap().code, Some(DbError::TIMEOUT));
 
 Codes, severity, kinds, and the catalog are constants: reading them costs a `match`, and nothing is allocated. Every mistake (a duplicate number, a code without help, a severity outside 1 to 24) is a compile error that says what to do.
 
-## Scope
+### Reporting
 
-The shape of the full Tier 1 API, with the reporting facade that arrives in `0.5.0`:
+Any crate calls the verbs; the application installs one reporter at start-up. With nothing installed, a verb is one atomic load and returns.
 
 ```rust
-use define_err::prelude::*;
+use define_err::{Event, Reporter};
 
-define_errors! {
-    namespace = "DB";
+struct StderrReporter;
 
-    pub enum DbError {
-        NotFound { page: u64 } => "page {page} not found",
-
-        #[code(1, help = "Raise pool.size or lower the load.")]
-        #[category(DeadlineExceeded)]
-        Timeout { after_ms: u64 } => "query timed out after {after_ms} ms",
-
-        Io(#[from] source: std::io::Error) => "page file i/o failed",
+impl Reporter for StderrReporter {
+    fn receive(&self, event: &Event<'_>) {
+        let at = event.location();
+        match (event.error(), event.message()) {
+            (Some(err), _) => eprintln!("{} {}:{} {err}", event.severity(), at.file(), at.line()),
+            (None, Some(msg)) => eprintln!("{} {}:{} {msg}", event.severity(), at.file(), at.line()),
+            (None, None) => {}
+        }
     }
 }
 
-let err = DbError::Timeout { after_ms: 5000 };
-assert_eq!(err.code().unwrap().to_string(), "DB-0001");
-assert_eq!(err.category().http_status(), 504);
+static REPORTER: StderrReporter = StderrReporter;
 
-define_err::report(&err);                            // never changes control flow
-define_err::warn("cache file is stale, rebuilding");  // once per call site
+fn main() {
+    define_err::set_reporter(&REPORTER).expect("install the reporter first thing in main");
+
+    define_err::notice("started");
+    define_err::warn("cache file is stale, rebuilding");  // once per call site
+    // define_err::report(&err);                          // never changes control flow
+}
 ```
+
+`ErrorRecord` is the owned, bounded snapshot for anything that outlives the event, and `testing::capture` tests code that reports. [`docs/FACADE.md`](./docs/FACADE.md) has the reporter contract.
+
+## Scope
 
 | Part | Arrives in |
 |---|---|
 | `define_errors!`: enums and structs, messages, `source`, `From`, `transparent`, `#[non_exhaustive]` by default, `Secret<T>`, `Location` | `0.3.0` (shipped) |
 | Codes, the catalog, severity, categories, kinds, `ErrorInfo`, the identity probe | `0.4.0` (shipped) |
-| The reporting facade (`set_reporter`, `report`, `notice`, `warn`, `trigger`, `deprecated`, `soft`), `ErrorRecord`, test capture | `0.5.0` |
+| The reporting facade (`set_reporter`, `report`, `notice`, `warn`, `trigger`, `deprecated`, `soft`), `ErrorRecord`, test capture, `#[cfg]` | `0.5.0` (shipped) |
 
 Errors are values in Rust; there is no throw event. The facade sees an error only when code calls one of its verbs. It cannot see an error discarded with `let _ =`, `.ok()`, or `unwrap_or`, or a typed error that is built and never reported.
 

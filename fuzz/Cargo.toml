@@ -49,3 +49,10 @@ path = "fuzz_targets/probe_decode.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "record_from_chain"
+path = "fuzz_targets/record_from_chain.rs"
+test = false
+doc = false
+bench = false

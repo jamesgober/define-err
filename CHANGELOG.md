@@ -13,6 +13,62 @@
 
 ---
 
+## [0.5.0] - 2026-11-02
+
+The reporting facade and the owned record. Feature complete.
+
+### Added
+
+- The reporting facade: `Reporter`, `set_reporter`, `set_boxed_reporter`,
+  `is_installed`, `reporter`, `reporter_installed_at`, `flush`; the verbs
+  `report`, `report_with`, `report_record`, `notice`, `notice_with`, `warn`,
+  `warn_with`, `trigger`, `deprecated`, `soft`, and the macros `notice!`,
+  `warn!`, `trigger!`, `deprecated!`; `Event`, `Verb`; `WarnMode`,
+  `set_warn_mode`, `set_min_severity`, `set_kinds_mask` and their readers;
+  `stats` and `FacadeStats`; `InstallError` and `Slot`. One atomic load with
+  nothing installed. With `std`, a verb called inside a reporter is dropped
+  and counted, and a panic inside one is caught and counted. On targets
+  without compare-and-swap the verbs compile to nothing.
+- Once per call site: an exact flag behind the macros, a lock-free 512-site
+  table behind the functions, and an overflow counter, so a warning is never
+  lost to the table. A warning that could not be delivered keeps its site.
+- The creation hook: `CreationHook`, `CreationInfo`, `Annotate`,
+  `set_creation_hook`, `creation_hook`.
+- `ErrorRecord`, `RecordLimits`, `ChainEntry`, `TrailEntry`, `TrailStep`: an
+  owned, bounded snapshot of an error, with `from_error`, `from_event`,
+  `new`, the `push_*` methods, and a one-line `Display`.
+- `testing::capture` and `CaptureReporter`: per-thread capture for tests of
+  code that reports.
+- `#[cfg]` on variants and on plain fields of braced variants and structs.
+- `Identity::public`: a variant's `#[public]` text, readable through
+  `&dyn Error`.
+- `docs/FACADE.md`, `docs/MIGRATION.md`, `docs/CODES.md`; examples `plain`,
+  `codes`, `facade`, `migration_before_after`, and the `examples/no_std`
+  crate, built on all four bare-metal targets in CI.
+- Tests: loom models of the slot, settings, site flags, and table, with a CI
+  job; facade tests of every verb, filter, and guard; record bounds, with a
+  property test, the fuzz target `record_from_chain`, and exact allocation
+  counts; every verb checked allocation-free in every state.
+
+### Generated code
+
+- New `__private` items: `probe_len`, `Site`, `notice_args`, `warn_ready`,
+  `warn_site`, `trigger_args`, `deprecated_site`.
+- `ProbeBuf` is now `ProbeBuf<const N: usize>`, exactly as long as its
+  probe, and `new` takes `transparent: bool` and `public: Option<&str>`.
+- The probe adds `|` and the public message when flag bit 0 is set;
+  `tests/golden/probe.txt` updated. A public message longer than 512 bytes
+  is a compile error.
+- Arms, `From` impls, constants, catalog entries, and the block's checks
+  carry a variant's `#[cfg]`, copied from the input.
+
+### Changed
+
+- `docs/API.md`, `docs/GENERATED-CODE.md`: the items above, and the behaviour
+  of filtered warnings.
+
+---
+
 ## [0.4.0] - 2026-11-02
 
 Codes and metadata.
@@ -211,7 +267,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jamesgober/define-err/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/define-err/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/define-err/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/jamesgober/define-err/compare/v0.1.0...v0.2.0

@@ -91,33 +91,69 @@
 //! duplicate number, a code without help) is a compile error. Libraries
 //! that hold errors as `&dyn Error` read the same facts with [`identify`].
 //!
-//! A reporting facade any crate can call (`report`, `notice`, `warn`,
-//! `trigger`) arrives in `0.5.0`. Errors are values: nothing is reported
-//! unless code reports it, and building an error never runs any code.
+//! ## Reporting
+//!
+//! Any crate can call the verbs ([`report`], [`notice()`], [`warn()`],
+//! [`trigger()`], [`deprecated()`], [`soft`]); the application installs one
+//! [`Reporter`] at start-up with [`set_reporter`]. With nothing installed, a
+//! verb costs one atomic load.
+//!
+//! ```
+//! use define_err::{Event, Reporter};
+//!
+//! struct StderrReporter;
+//!
+//! impl Reporter for StderrReporter {
+//!     fn receive(&self, event: &Event<'_>) {
+//!         let at = event.location();
+//!         match (event.error(), event.message()) {
+//!             (Some(err), _) => eprintln!("{} {}:{} {err}", event.severity(), at.file(), at.line()),
+//!             (None, Some(msg)) => eprintln!("{} {}:{} {msg}", event.severity(), at.file(), at.line()),
+//!             (None, None) => {}
+//!         }
+//!     }
+//! }
+//!
+//! static REPORTER: StderrReporter = StderrReporter;
+//!
+//! define_err::set_reporter(&REPORTER).unwrap();
+//! define_err::warn("cache file is stale, rebuilding");  // once per call site
+//! ```
+//!
+//! `ErrorRecord` (with `alloc`) is the owned snapshot for anything that
+//! outlives the event.
+//!
+//! ## What can never be observed
+//!
+//! Errors are values; there is no throw event. The facade sees an error only
+//! when code calls one of its verbs. It cannot see an error discarded with
+//! `let _ =`, `.ok()`, or `unwrap_or`, or a typed error that is built and
+//! never reported: building an error never runs any code.
 //!
 //! ## Features
 //!
 //! | Feature | Default | Brings |
 //! |---|---|---|
-//! | `std` | yes | implies `alloc`; `ErrorInfo` and `Category::from_io_kind` for `std::io::Error` |
-//! | `alloc` | through `std` | boxed `dyn Error` sources (`Box<dyn Error + Send + Sync>` and friends) |
-//! | `testing` | no | implies `std`; from `0.5.0`, a capturing reporter for tests |
+//! | `std` | yes | implies `alloc`; `ErrorInfo` and `Category::from_io_kind` for `std::io::Error`; the facade's guards |
+//! | `alloc` | through `std` | `ErrorRecord`, boxed `dyn Error` sources, `set_boxed_reporter` |
+//! | `testing` | no | implies `std`; `testing::capture`, a capturing reporter for tests |
 //!
 //! With `--no-default-features` the crate uses `core` only, and every
-//! `define_errors!` form works except boxed sources.
+//! `define_errors!` form works except boxed sources. `std` adds the facade's
+//! reentrancy guard and panic isolation. On targets without compare-and-swap
+//! the verbs compile to nothing and `set_reporter` does not exist.
 //!
 //! ## Status
 //!
-//! `0.4.0`: the thiserror-parity core, plus codes, the catalog, severity,
-//! categories, kinds, and the identity probe. The public API of 1.0 is written in
+//! `0.5.0`: feature complete. The public API of 1.0 is written in
 //! `docs/API.md` and what the macro expands to in `docs/GENERATED-CODE.md`
 //! (both in the [repository](https://github.com/jamesgober/define-err)).
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/define-err")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-// `deny`, not `forbid`: the reporting facade (0.5) keeps one write-once slot
-// in a single allowed module, `src/facade/slot.rs` (dev/PLAN.md, D-003).
+// `deny`, not `forbid`: the reporting facade keeps one write-once slot in a
+// single allowed module, `src/facade/slot.rs` (dev/PLAN.md, D-003).
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -146,21 +182,44 @@ extern crate std;
 
 mod category;
 mod code;
+mod facade;
 mod info;
 mod kinds;
 mod location;
 mod macros;
 mod probe;
+#[cfg(feature = "alloc")]
+mod record;
 mod secret;
 mod severity;
+
+/// Capturing what the facade delivers, for tests of code that reports.
+#[cfg(all(feature = "testing", target_has_atomic = "32"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "testing")))]
+pub mod testing;
 
 #[doc(hidden)]
 #[path = "private.rs"]
 pub mod __private;
 
+#[cfg(feature = "alloc")]
+pub use crate::facade::report_record;
+#[cfg(all(feature = "alloc", target_has_atomic = "32"))]
+pub use crate::facade::set_boxed_reporter;
+#[cfg(target_has_atomic = "32")]
+pub use crate::facade::{set_creation_hook, set_reporter};
+#[cfg(feature = "alloc")]
+pub use crate::record::{ChainEntry, ErrorRecord, RecordLimits, TrailEntry, TrailStep};
 pub use crate::{
     category::{Action, Category, RetryAdvice},
     code::{Code, CodeParseError, Namespace, NamespaceStr},
+    facade::{
+        creation_hook, deprecated, flush, is_installed, kinds_mask, min_severity, notice,
+        notice_with, report, report_with, reporter, reporter_installed_at, set_kinds_mask,
+        set_min_severity, set_warn_mode, soft, stats, trigger, warn, warn_mode, warn_with,
+        Annotate, CreationHook, CreationInfo, Event, FacadeStats, InstallError, Reporter, Slot,
+        Verb, WarnMode,
+    },
     info::{catalog, CodeInfo, CodeState, ErrorInfo, UrlDisplay},
     kinds::{Kinds, KindsIter},
     location::{here, Location},
@@ -174,8 +233,8 @@ pub use crate::{
 /// Brings [`define_errors!`], [`ErrorInfo`] (the trait behind `.code()`,
 /// `.category()`, `.public_message()`, and the other metadata methods),
 /// [`Code`], [`Severity`], [`Category`], [`Kinds`], [`Action`], [`Secret`],
-/// and [`Location`]. The reporting verbs (from `0.5.0`) are not in the
-/// prelude: they are called by path, `define_err::report(&err)`.
+/// and [`Location`]. The reporting verbs are not in the prelude: they are
+/// called by path, `define_err::report(&err)`.
 ///
 /// # Examples
 ///

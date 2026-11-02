@@ -1,5 +1,6 @@
 //! Construction, `Display` into a fixed buffer, `source()`, the `ErrorInfo`
-//! methods, `From`, and `Secret` formatting allocate nothing (NFR-3, 12.6).
+//! methods, `From`, `Secret` formatting, and every verb allocate nothing
+//! (NFR-3, 12.6).
 
 use std::{
     alloc::{GlobalAlloc, Layout, System},
@@ -8,7 +9,7 @@ use std::{
     fmt::Write as _,
 };
 
-use define_err::{define_errors, identify, prelude::*, Namespace};
+use define_err::{define_errors, identify, prelude::*, Event, Namespace, Reporter};
 
 struct Counting;
 
@@ -149,4 +150,49 @@ fn test_codes_metadata_and_probe_allocate_nothing() {
     assert_eq!(count, 0);
     let text = std::str::from_utf8(&buffer.bytes[..buffer.len]).unwrap();
     assert_eq!(text, "DB-0042|ERROR|deadline_exceeded|ERROR|SECURITY|");
+}
+
+struct Quiet;
+
+impl Reporter for Quiet {
+    fn receive(&self, _event: &Event<'_>) {}
+}
+
+static QUIET: Quiet = Quiet;
+
+/// E-65, and the same verbs delivered: the facade itself allocates nothing.
+#[test]
+fn test_verbs_allocate_nothing() {
+    fn every_verb() {
+        let err = Coded::Timeout { after_ms: 5 };
+        define_err::report(&err);
+        define_err::report_with(&err, Severity::DEBUG, Kinds::AUDIT);
+        define_err::notice("text");
+        define_err::notice!("text {}", 1);
+        define_err::warn("text");
+        define_err::warn!("text {}", 1);
+        define_err::trigger(Kinds::SECURITY, "text");
+        define_err::trigger!(Kinds::SECURITY, "text {}", 1);
+        define_err::deprecated("text");
+        define_err::deprecated!("text", since = "1.0.0");
+        assert!(define_err::soft(Coded::Timeout { after_ms: 5 }).is_ok());
+        define_err::flush();
+    }
+
+    assert_eq!(allocations_during(every_verb), 0);
+    define_err::set_reporter(&QUIET).unwrap();
+    assert_eq!(allocations_during(every_verb), 0);
+    assert_eq!(allocations_during(every_verb), 0);
+}
+
+/// 12.6: the exact cost of a record, for a fixed input.
+#[cfg(feature = "alloc")]
+#[test]
+fn test_record_allocation_count() {
+    let err = Coded::Timeout { after_ms: 5 };
+    let mut record = None;
+    let count = allocations_during(|| record = Some(define_err::ErrorRecord::from_error(&err)));
+    assert_eq!(record.unwrap().chain.len(), 1);
+    // The chain's vector, the message (it grows once), and the type name.
+    assert_eq!(count, 4);
 }
