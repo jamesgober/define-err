@@ -1,0 +1,44 @@
+error[E0277]: `Arguments<'_>` cannot be sent between threads safely
+ --> tests/ui/event_not_send.rs:6:10
+  |
+6 |     send(Event::new(Verb::Notice, here()));
+  |     ---- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Arguments<'_>` cannot be sent between threads safely
+  |     |
+  |     required by a bound introduced by this call
+  |
+  = help: within `Event<'_>`, the trait `Send` is not implemented for `Arguments<'_>`
+note: required because it appears within the type `Option<Arguments<'_>>`
+ --> $RUST/core/src/option.rs
+note: required because it appears within the type `Event<'_>`
+ --> src/facade/event.rs
+  |
+  | pub struct Event<'a> {
+  |            ^^^^^
+note: required by a bound in `send`
+ --> tests/ui/event_not_send.rs:3:12
+  |
+3 | fn send<T: Send>(_: T) {}
+  |            ^^^^ required by this bound in `send`
+
+error[E0277]: `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+ --> tests/ui/event_not_send.rs:6:10
+  |
+6 |     send(Event::new(Verb::Notice, here()));
+  |     ---- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `(dyn std::error::Error + 'static)` cannot be shared between threads safely
+  |     |
+  |     required by a bound introduced by this call
+  |
+  = help: the trait `Sync` is not implemented for `(dyn std::error::Error + 'static)`
+  = note: required for `&(dyn std::error::Error + 'static)` to implement `Send`
+note: required because it appears within the type `Option<&(dyn std::error::Error + 'static)>`
+ --> $RUST/core/src/option.rs
+note: required because it appears within the type `Event<'_>`
+ --> src/facade/event.rs
+  |
+  | pub struct Event<'a> {
+  |            ^^^^^
+note: required by a bound in `send`
+ --> tests/ui/event_not_send.rs:3:12
+  |
+3 | fn send<T: Send>(_: T) {}
+  |            ^^^^ required by this bound in `send`

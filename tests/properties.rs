@@ -2,6 +2,8 @@
 //! "never panics" for every parser and decoder.
 
 use define_err::{identify, Category, Code, Kinds, Namespace, Secret, Severity};
+#[cfg(feature = "alloc")]
+use define_err::{ErrorRecord, RecordLimits};
 use proptest::prelude::*;
 
 /// Any valid namespace text: a letter, then up to five letters or digits.
@@ -141,5 +143,31 @@ fn test_category_round_trips() {
             Category::parse(&category.name().to_uppercase()),
             Some(category)
         );
+    }
+}
+
+#[cfg(feature = "alloc")]
+proptest! {
+    #[test]
+    fn prop_record_stays_inside_its_limits(
+        parts in proptest::collection::vec("\\PC{0,40}", 0..12),
+        message in 0_usize..64,
+        total in 0_usize..256,
+    ) {
+        let mut limits = RecordLimits::DEFAULT;
+        limits.max_message_bytes = message;
+        limits.max_total_bytes = total;
+        let mut record = ErrorRecord::new(None, Severity::ERROR, Category::Internal, Kinds::ERROR).with_limits(limits);
+        for part in &parts {
+            let kept = record.push_chain(part, None, "t");
+            prop_assert!(kept || record.truncated);
+        }
+        let used: usize = record.chain.iter().map(|entry| entry.message.len()).sum();
+        prop_assert!(used <= total);
+        for (entry, part) in record.chain.iter().zip(&parts) {
+            prop_assert!(entry.message.len() <= message);
+            // Cut on a character boundary, so what is kept is a prefix.
+            prop_assert!(part.starts_with(&entry.message));
+        }
     }
 }

@@ -4,10 +4,10 @@
 //!
 //! ```text
 //! @enum [block context] [type attributes] (vis) Name [ (
-//!     [variant attributes] [code] [category] [severity] [kinds] [public] [action] [retryable] [retry_after]
+//!     [variant attributes] [code] [category] [severity] [kinds] [public] [action] [retryable] [retry_after] [cfg]
 //!     Variant
-//!     { { [field attributes] [field vis] role name : Type } ... }     // braced, or
-//!     ( { [field attributes] [field vis] role name : Type } ... )     // tuple, or nothing (unit)
+//!     { { [field attributes] [field vis] [field cfg] role name : Type } ... }     // braced, or
+//!     ( { [field attributes] [field vis] [field cfg] role name : Type } ... )     // tuple, or nothing (unit)
 //!     => message
 //! ) ... ]
 //! @struct [block context] [type attributes] [metadata slots] (vis) Name { fields } => message
@@ -26,32 +26,30 @@ macro_rules! __define_err_emit {
     (@enum [$ns:tt $docs:tt $rall:tt $rf:tt [$($acc:tt)*] [$($rest:tt)*]]
         [$($tattr:tt)*] ($vis:vis) $name:ident [ $(
         ( [$($vattr:tt)*]
-          [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]
+          [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?] $vcfg:tt
           $vn:ident
-          $({ $( { [$($fattr:tt)*] [$($fvis:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
-          $(( $( { [$($xattr:tt)*] [$($xvis:tt)*] $xrole:ident $xname:ident : $xty:ty } )* ))?
+          $({ $( { [$($fattr:tt)*] [$($fvis:tt)*] [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
+          $(( $( { [$($xattr:tt)*] [$($xvis:tt)*] [$($xcfg:tt)*] $xrole:ident $xname:ident : $xty:ty } )* ))?
           => $msg:tt )
     )* ]) => {
-        $($tattr)*
-        $vis enum $name { $(
-            $($vattr)*
-            $vn
-            $({ $( $($fattr)* $fname: $fty, )* })?
-            $(( $( $($xattr)* $xty, )* ))?,
-        )* }
+        $crate::__define_err_emit! { @enum_def [$($tattr)*] ($vis) $name [ $(
+            ( $vcfg [$($vattr)*] $vn
+              $({ $( $($fattr)* $fname: $fty, )* })?
+              $(( $( $($xattr)* $xty, )* ))? )
+        )* ] }
 
         $( $crate::__define_err_code!(@check $ns [$($code)?]); )*
 
         $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
-            ( [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
+            ( $vcfg [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
               [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { $frole $fname : $fty } )* })?
+              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
               $(( $( { $xrole $xname : $xty } )* ))?
               => $msg )
         )* ] }
 
         $crate::__define_err_block! {
-            @types [$ns $docs $rall [] [$($acc)* $( $( { $code } )? )*]] $($rest)*
+            @types [$ns $docs $rall [] [$($acc)* $( $( { $vcfg $code } )? )*]] $($rest)*
         }
     };
 
@@ -59,8 +57,8 @@ macro_rules! __define_err_emit {
         [$($tattr:tt)*]
         [[$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]]
         ($vis:vis) $name:ident
-        $({ $( { [$($fattr:tt)*] [$($fvis:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
-        $(( $( { [$($xattr:tt)*] [$($xvis:tt)*] $xrole:ident $xname:ident : $xty:ty } )* ))?
+        $({ $( { [$($fattr:tt)*] [$($fvis:tt)*] [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
+        $(( $( { [$($xattr:tt)*] [$($xvis:tt)*] [$($xcfg:tt)*] $xrole:ident $xname:ident : $xty:ty } )* ))?
         => $msg:tt) => {
         $crate::__define_err_emit! { @struct_def [$($tattr)*] ($vis) $name
             $({ $( { [$($fattr)*] [$($fvis)*] $fname : $fty } )* })?
@@ -70,16 +68,27 @@ macro_rules! __define_err_emit {
         $crate::__define_err_code!(@check $ns [$($code)?]);
 
         $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
-            ( [Self] [::core::stringify!($name)] [::core::stringify!($name)]
+            ( [] [Self] [::core::stringify!($name)] [::core::stringify!($name)]
               [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { $frole $fname : $fty } )* })?
+              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
               $(( $( { $xrole $xname : $xty } )* ))?
               => $msg )
         ] }
 
         $crate::__define_err_block! {
-            @types [$ns $docs $rall [] [$($acc)* $( { $code } )?]] $($rest)*
+            @types [$ns $docs $rall [] [$($acc)* $( { [] $code } )?]] $($rest)*
         }
+    };
+
+    (@enum_def [$($tattr:tt)*] ($vis:vis) $name:ident [ $(
+        ( [$($vcfg:tt)*] [$($vattr:tt)*] $vn:ident $($body:tt)? )
+    )* ]) => {
+        $($tattr)*
+        $vis enum $name { $(
+            $($vcfg)*
+            $($vattr)*
+            $vn $($body)?,
+        )* }
     };
 
     (@struct_def [$($tattr:tt)*] ($vis:vis) $name:ident { $( { [$($fattr:tt)*] [$($fvis:tt)*] $fname:ident : $fty:ty } )* }) => {
@@ -96,9 +105,9 @@ macro_rules! __define_err_emit {
     };
 
     (@impls [$ns:tt $docs:tt $rf:tt] ($vis:vis) $name:ident [ $(
-        ( [$($path:tt)*] [$($tname:tt)*] [$($title:tt)*]
+        ( [$($vcfg:tt)*] [$($path:tt)*] [$($tname:tt)*] [$($title:tt)*]
           [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]
-          $({ $( { $frole:ident $fname:ident : $fty:ty } )* })?
+          $({ $( { [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
           $(( $( { $xrole:ident $xname:ident : $xty:ty } )* ))?
           => $msg:tt )
     )* ]) => {
@@ -107,7 +116,7 @@ macro_rules! __define_err_emit {
             fn fmt(&self, __define_err_f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_fmt!(__define_err_f; $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
             }
@@ -118,7 +127,7 @@ macro_rules! __define_err_emit {
             fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_source!($msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
             }
@@ -126,7 +135,7 @@ macro_rules! __define_err_emit {
             fn description(&self) -> &str {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_probe!(
                             $ns [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($tname)*];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?
@@ -140,7 +149,7 @@ macro_rules! __define_err_emit {
             fn code(&self) -> ::core::option::Option<$crate::Code> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(code [$crate::__define_err_code!(@option $ns [$($code)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -149,7 +158,7 @@ macro_rules! __define_err_emit {
             fn code_info(&self) -> ::core::option::Option<&'static $crate::CodeInfo> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(code_info [$crate::__define_err_code!(@info
                                 $ns $docs [$($tname)*] [$($title)*] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?]
                                 [$($code)?])];
@@ -160,7 +169,7 @@ macro_rules! __define_err_emit {
             fn category(&self) -> $crate::Category {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(category [$crate::__define_err_value!(@category [$($cat)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -169,7 +178,7 @@ macro_rules! __define_err_emit {
             fn severity(&self) -> $crate::Severity {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(severity [$crate::__define_err_value!(@severity [$($sev)?] [$($cat)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -178,7 +187,7 @@ macro_rules! __define_err_emit {
             fn kinds(&self) -> $crate::Kinds {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(kinds [$crate::__define_err_value!(@kinds [$($kinds)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -187,7 +196,7 @@ macro_rules! __define_err_emit {
             fn public_message(&self) -> &'static str {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(public_message [$crate::__define_err_value!(@public [$($public)?] [$($cat)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -196,7 +205,7 @@ macro_rules! __define_err_emit {
             fn help(&self) -> ::core::option::Option<&'static str> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(help [$crate::__define_err_code!(@help [$($code)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -205,7 +214,7 @@ macro_rules! __define_err_emit {
             fn action(&self) -> $crate::Action {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(action [$crate::__define_err_value!(@action [$($action)?] [$($cat)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -214,7 +223,7 @@ macro_rules! __define_err_emit {
             fn is_retryable(&self) -> bool {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(is_retryable [$crate::__define_err_value!(@retryable [$($retry)?] [$($cat)?])];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -223,7 +232,7 @@ macro_rules! __define_err_emit {
             fn retry_after(&self) -> ::core::option::Option<::core::time::Duration> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(retry_after
                             [$crate::__define_err_value!(@retry_after [$($ra)?] []; $($( $frole $fname )*)? $($( $xrole $xname )*)?)];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
@@ -233,7 +242,7 @@ macro_rules! __define_err_emit {
             fn location(&self) -> ::core::option::Option<$crate::Location> {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_location!($msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
             }
@@ -241,7 +250,7 @@ macro_rules! __define_err_emit {
             fn type_name(&self) -> &'static str {
                 #[allow(unused_variables)]
                 match *self { $(
-                    $($path)* $({ $( ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
                         $crate::__define_err_forward!(type_name [$($tname)*];
                             $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
@@ -249,6 +258,7 @@ macro_rules! __define_err_emit {
         }
 
         $(
+            $($vcfg)*
             $crate::__define_err_from! {
                 $name [$($path)*]
                 $( braced $( $frole $fname : $fty ; )* )?
@@ -258,10 +268,10 @@ macro_rules! __define_err_emit {
 
         #[allow(deprecated)]
         impl $name {
-            $( $crate::__define_err_code!(@const ($vis) $ns [$($code)?]); )*
+            $( $($vcfg)* $crate::__define_err_code!(@const ($vis) $ns [$($code)?]); )*
 
             $crate::__define_err_catalog! { $ns $docs $rf ($vis) [ $(
-                ( [$($tname)*] [$($title)*] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($code)?] )
+                ( [$($vcfg)*] [$($tname)*] [$($title)*] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($code)?] )
             )* ] }
         }
     };
@@ -279,14 +289,14 @@ macro_rules! __define_err_emit {
 macro_rules! __define_err_catalog {
     ([] [$($docs:tt)*] [$($rf:tt)*] ($vis:vis) [$($entries:tt)*]) => {};
     ($ns:tt $docs:tt [$($rf:literal)*] ($vis:vis) [ $(
-        ( [$($tname:tt)*] [$($title:tt)*] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($code:tt)?] )
+        ( [$($vcfg:tt)*] [$($tname:tt)*] [$($title:tt)*] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($code:tt)?] )
     )* ]) => {
         /// The catalog entries of this type: one per code, plus the block's
         /// retired numbers on the block's first type. Generated by
         /// `define_errors!`.
         $vis const CATALOG: &'static [$crate::CodeInfo] = {
             const PARTS: &[&[$crate::CodeInfo]] = &[
-                $( $crate::__define_err_code!(@part
+                $( $($vcfg)* $crate::__define_err_code!(@part
                     $ns $docs [$($tname)*] [$($title)*] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?]
                     [$($code)?]), )*
                 $( &[$crate::__private::retired_code($crate::__define_err_ns!($ns), $rf)], )*
@@ -493,8 +503,9 @@ macro_rules! __define_err_value {
     (@public [$($x:tt)*] [$($cat:tt)?]) => {
         ::core::compile_error! { "define_errors!: `#[public]` takes one string, for example `#[public(\"The service is busy.\")]`" }
     };
-    (@public_flag []) => { 0_u8 };
-    (@public_flag [$x:tt]) => { 1_u8 };
+    (@probe_public []) => { ::core::option::Option::None };
+    (@probe_public [($text:literal)]) => { ::core::option::Option::Some($text) };
+    (@probe_public [$($x:tt)*]) => { ::core::option::Option::None };
 
     (@action [] [$($cat:tt)?]) => { $crate::Category::default_action($crate::__define_err_value!(@category [$($cat)?])) };
     (@action [($name:ident)] [$($cat:tt)?]) => { $crate::Action::$name };
@@ -555,20 +566,23 @@ macro_rules! __define_err_forward {
 macro_rules! __define_err_probe {
     ([$($ns:tt)*] [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($tname:tt)*]; transparent; $($roles:tt)*) => {
         $crate::__define_err_transparent!(@probe [
-            $crate::__define_err_probe!(@build [$($ns)*] [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($tname)*] 2_u8)
+            $crate::__define_err_probe!(@build [$($ns)*] [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($tname)*] true)
         ]; $($roles)*)
     };
     ([$($ns:tt)*] [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($tname:tt)*]; $msg:tt; $($roles:tt)*) => {
-        $crate::__define_err_probe!(@build [$($ns)*] [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($tname)*] 0_u8)
+        $crate::__define_err_probe!(@build [$($ns)*] [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($tname)*] false)
     };
-    (@build [$($ns:tt)*] [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($tname:tt)*] $flag:expr) => {{
-        const __DEFINE_ERR_PROBE: &$crate::__private::ProbeBuf = &$crate::__private::ProbeBuf::new(
+    (@build [$($ns:tt)*] [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($tname:tt)*] $transparent:expr) => {{
+        const __DEFINE_ERR_PUBLIC: ::core::option::Option<&str> = $crate::__define_err_value!(@probe_public [$($public)?]);
+        const __DEFINE_ERR_LEN: usize = $crate::__private::probe_len($($tname)*, __DEFINE_ERR_PUBLIC);
+        const __DEFINE_ERR_PROBE: &$crate::__private::ProbeBuf<__DEFINE_ERR_LEN> = &$crate::__private::ProbeBuf::new(
             $crate::__define_err_code!(@raw [$($ns)*] [$($code)?]),
             $crate::Severity::get($crate::__define_err_value!(@severity [$($sev)?] [$($cat)?])),
             $crate::Category::grpc_code($crate::__define_err_value!(@category [$($cat)?])),
             $crate::Kinds::bits($crate::__define_err_value!(@kinds [$($kinds)?])),
-            $crate::__define_err_value!(@public_flag [$($public)?]) | $flag,
+            $transparent,
             $($tname)*,
+            __DEFINE_ERR_PUBLIC,
         );
         const __DEFINE_ERR_TEXT: &str = __DEFINE_ERR_PROBE.as_str();
         __DEFINE_ERR_TEXT

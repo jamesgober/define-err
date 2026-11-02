@@ -192,22 +192,22 @@ macro_rules! __define_err_block {
     (@types [[] [] [] [$($rf:tt)*] [$($acc:tt)*]]) => {};
 
     // The block's checks, after its last type.
-    (@types [[$ns:literal $($w:literal)?] [$($docs:literal)?] [$($rall:literal)*] [$($rf:tt)*] [$( { $code:tt } )*]]) => {
+    (@types [[$ns:literal $($w:literal)?] [$($docs:literal)?] [$($rall:literal)*] [$($rf:tt)*] [$( { [$($c:tt)*] $code:tt } )*]]) => {
         const _: () = {
             // The namespace and every code number are checked here, once;
             // everywhere else they fall back to placeholders.
             let namespace = $crate::__private::namespace($ns, $crate::__define_err_code!(@width $($w)?));
-            $( let _ = $crate::__private::code(namespace, $crate::__define_err_code!(@number $code)); )*
+            $( $($c)* let _ = $crate::__private::code(namespace, $crate::__define_err_code!(@number $code)); )*
             $crate::__private::check_block(
                 ::core::concat!("define_errors!: duplicate code number in namespace ", $ns),
-                &[ $( $crate::__define_err_code!(@number $code) ),* ],
+                &[ $( $($c)* $crate::__define_err_code!(@number $code) ),* ],
                 &[ $( $rall ),* ],
-                &[ $( $crate::__define_err_code!(@replacement $code) ),* ],
+                &[ $( $($c)* $crate::__define_err_code!(@replacement $code) ),* ],
             );
             $( $crate::__private::check_docs($docs); )?
             #[deny(unreachable_patterns)]
             match 0_u32 {
-                $( $crate::__define_err_code!(@number $code) => {} )*
+                $( $($c)* $crate::__define_err_code!(@number $code) => {} )*
                 $( $rall => {} )*
                 _ => {}
             }
@@ -328,7 +328,8 @@ macro_rules! __define_err_type {
     };
 }
 
-/// Sets one of the eight metadata slots, then returns to the caller:
+/// Sets one of the eight metadata slots (an enum variant keeps a ninth, for
+/// `#[cfg]`, after them), then returns to the caller:
 /// `@set key argument; [slots]; caller-macro @state [state...]; rest`.
 #[doc(hidden)]
 #[macro_export]
@@ -351,14 +352,14 @@ macro_rules! __define_err_meta_slot {
     (@set action $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt [] $($s:tt)*]; $m:ident @$st:ident $($state:tt)*) => {
         $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 [$a] $($s)*] $($state)* }
     };
-    (@set retryable; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt [] $s8:tt]; $m:ident @$st:ident $($state:tt)*) => {
-        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 [()] $s8] $($state)* }
+    (@set retryable; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt [] $($s:tt)*]; $m:ident @$st:ident $($state:tt)*) => {
+        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 [()] $($s)*] $($state)* }
     };
-    (@set retryable $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt [] $s8:tt]; $m:ident @$st:ident $($state:tt)*) => {
-        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 [($a)] $s8] $($state)* }
+    (@set retryable $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt [] $($s:tt)*]; $m:ident @$st:ident $($state:tt)*) => {
+        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 [($a)] $($s)*] $($state)* }
     };
-    (@set retry_after $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt $s7:tt []]; $m:ident @$st:ident $($state:tt)*) => {
-        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 $s7 [$a]] $($state)* }
+    (@set retry_after $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt $s7:tt [] $($s:tt)*]; $m:ident @$st:ident $($state:tt)*) => {
+        $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 $s7 [$a] $($s)*] $($state)* }
     };
     (@set code; $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: `#[code]` needs a number and help text, for example `#[code(1, help = \"Raise pool.size.\")]`" }
@@ -385,6 +386,7 @@ macro_rules! __define_err_enum {
     // Fast path: the whole enum in canonical form, in one non-recursive arm.
     (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $(
         $(#[doc $($doc:tt)*])*
+        $(#[cfg $cfg:tt])*
         $(#[code $code:tt])?
         $(#[category $cat:tt])?
         $(#[severity $sev:tt])?
@@ -416,11 +418,11 @@ macro_rules! __define_err_enum {
     ),* $(,)? }) => {
         $crate::__define_err_emit! { @enum [$($ctx)*] [$($tattr)*] ($vis) $name [ $(
             ( [$(#[doc $($doc)*])*]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$( ( $($retry)? ) )?] [$($ra)?]
+              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$( ( $($retry)? ) )?] [$($ra)?] [$(#[cfg $cfg])*]
               $vn
-              $({ $( { [$(#[doc $($bdoc)*])*] []
+              $({ $( { [$(#[doc $($bdoc)*])*] [] []
                   $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? : $bty } )* })?
-              $(( $( { [$(#[doc $($tdoc)*])*] []
+              $(( $( { [$(#[doc $($tdoc)*])*] [] []
                   $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? : $tty } )* ))?
               => $msg )
         )* ] }
@@ -428,11 +430,11 @@ macro_rules! __define_err_enum {
 
     // General path.
     (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $($body:tt)* }) => {
-        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [] [] [[] [] [] [] [] [] [] []] $($body)* }
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [] [] [[] [] [] [] [] [] [] [] []] $($body)* }
     };
 
     // All variants read: emit.
-    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [] [[] [] [] [] [] [] [] []]) => {
+    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [] [[] [] [] [] [] [] [] [] []]) => {
         $crate::__define_err_emit! { @enum [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*] }
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*]) => {
@@ -440,8 +442,9 @@ macro_rules! __define_err_enum {
     };
 
     // One variant already in canonical form: one step.
-    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [] [[] [] [] [] [] [] [] []]
+    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [] [[] [] [] [] [] [] [] [] []]
         $(#[doc $($doc:tt)*])*
+        $(#[cfg $cfg:tt])*
         $(#[code $code:tt])?
         $(#[category $cat:tt])?
         $(#[severity $sev:tt])?
@@ -474,14 +477,14 @@ macro_rules! __define_err_enum {
     ) => {
         $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*
             ( [$(#[doc $($doc)*])*]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$( ( $($retry)? ) )?] [$($ra)?]
+              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$( ( $($retry)? ) )?] [$($ra)?] [$(#[cfg $cfg])*]
               $vn
-              $({ $( { [$(#[doc $($bdoc)*])*] []
+              $({ $( { [$(#[doc $($bdoc)*])*] [] []
                   $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? : $bty } )* })?
-              $(( $( { [$(#[doc $($tdoc)*])*] []
+              $(( $( { [$(#[doc $($tdoc)*])*] [] []
                   $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? : $tty } )* ))?
               => $msg )
-        ] [] [[] [] [] [] [] [] [] []] $($($rest)*)? }
+        ] [] [[] [] [] [] [] [] [] [] []] $($($rest)*)? }
     };
 
     // Variant attributes, in any order: passed through, or metadata.
@@ -505,6 +508,11 @@ macro_rules! __define_err_enum {
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] #[deprecated $($a:tt)*] $($rest:tt)*) => {
         $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*] [$($va)* #[deprecated $($a)*]] [$($meta)*] $($rest)* }
+    };
+    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*]
+        [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt $s7:tt $s8:tt [$($c:tt)*]] #[cfg $($a:tt)*] $($rest:tt)*) => {
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*] [$($va)*]
+            [$s1 $s2 $s3 $s4 $s5 $s6 $s7 $s8 [$($c)* #[cfg $($a)*]]] $($rest)* }
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] #[code $($a:tt)*] $($rest:tt)*) => {
         $crate::__define_err_meta_slot! { @set code $($a)*; [$($meta)*]; __define_err_enum @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*] [$($va)*]; $($rest)* }
@@ -532,7 +540,7 @@ macro_rules! __define_err_enum {
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] #[$($a:tt)*] $($rest:tt)*) => {
         ::core::compile_error! {
-            "define_errors!: unknown attribute on a variant; valid here are doc comments, `#[allow]`, `#[warn]`, `#[deny]`, `#[forbid]`, `#[expect]`, `#[deprecated]`, `#[code]`, `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`, `#[action]`, `#[retryable]`, and `#[retry_after]`"
+            "define_errors!: unknown attribute on a variant; valid here are doc comments, `#[cfg]`, `#[allow]`, `#[warn]`, `#[deny]`, `#[forbid]`, `#[expect]`, `#[deprecated]`, `#[code]`, `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`, `#[action]`, `#[retryable]`, and `#[retry_after]`"
         }
     };
 
@@ -555,7 +563,7 @@ macro_rules! __define_err_enum {
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*]
         $vn:ident => $msg:tt $(, $($rest:tt)*)?) => {
-        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn => $msg )] [] [[] [] [] [] [] [] [] []] $($($rest)*)? }
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn => $msg )] [] [[] [] [] [] [] [] [] [] []] $($($rest)*)? }
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] $vn:ident $($rest:tt)*) => {
         ::core::compile_error! {
@@ -570,65 +578,76 @@ macro_rules! __define_err_enum {
 
     // Back from the field parser with one variant's canonical fields.
     (@done [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] $vn:ident braced $msg:tt [$($rest:tt)*] [$($fields:tt)*]) => {
-        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn { $($fields)* } => $msg )] [] [[] [] [] [] [] [] [] []] $($rest)* }
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn { $($fields)* } => $msg )] [] [[] [] [] [] [] [] [] [] []] $($rest)* }
     };
     (@done [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*] $vn:ident tuple $msg:tt [$($rest:tt)*] [$($fields:tt)*]) => {
-        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn ( $($fields)* ) => $msg )] [] [[] [] [] [] [] [] [] []] $($rest)* }
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)* ( [$($va)*] $($meta)* $vn ( $($fields)* ) => $msg )] [] [[] [] [] [] [] [] [] [] []] $($rest)* }
     };
 }
 
 /// Parses the fields of one variant or struct into canonical fields
-/// `{ [attributes] [visibility] role name : Type }`, then returns them to the
+/// `{ [attributes] [visibility] [cfg attributes] role name : Type }`, then returns them to the
 /// caller named in the continuation (`enum ...` or `struct ...`).
 ///
 /// State: `@f kind [continuation] [done fields] [pending attributes] [role]
-/// [unused] [names for unnamed fields]`.
+/// [cfg attributes] [names for unnamed fields]`.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __define_err_fields {
+    // `#[cfg]`: a tuple pattern cannot carry it, so braced fields only.
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] #[cfg $($a:tt)*] $($rest:tt)*) => {
+        ::core::compile_error! { "define_errors!: `#[cfg]` works on the fields of braced variants and structs; a tuple field has no name for the pattern to leave out" }
+    };
+    (@f braced [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] #[cfg $($a:tt)*] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f braced [$($cont)*] [$($done)*] [$($fa)* #[cfg $($a)*]] [$($role)*] [$($fc)* #[cfg $($a)*]] [$($pool)*] $($rest)* }
+    };
+
     // Field attributes, in any order.
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] [$($pool:tt)*] #[doc $($a:tt)*] $($rest:tt)*) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)* #[doc $($a)*]] [$($role)*] [] [$($pool)*] $($rest)* }
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] #[doc $($a:tt)*] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)* #[doc $($a)*]] [$($role)*] [$($fc)*] [$($pool)*] $($rest)* }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$($pool:tt)*] #[from] $($rest:tt)*) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [from] [] [$($pool)*] $($rest)* }
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [$($fc:tt)*] [$($pool:tt)*] #[from] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [from] [$($fc)*] [$($pool)*] $($rest)* }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$($pool:tt)*] #[source] $($rest:tt)*) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [source] [] [$($pool)*] $($rest)* }
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [$($fc:tt)*] [$($pool:tt)*] #[source] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [source] [$($fc)*] [$($pool)*] $($rest)* }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$($pool:tt)*] #[location] $($rest:tt)*) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [location] [] [$($pool)*] $($rest)* }
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [$($fc:tt)*] [$($pool:tt)*] #[location] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [location] [$($fc)*] [$($pool)*] $($rest)* }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$($pool:tt)*] #[retry_after] $($rest:tt)*) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [retry_after] [] [$($pool)*] $($rest)* }
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [$($fc:tt)*] [$($pool:tt)*] #[retry_after] $($rest:tt)*) => {
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)*] [$($fa)*] [retry_after] [$($fc)*] [$($pool)*] $($rest)* }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [] [$($pool:tt)*] #[from] $($rest:tt)*) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [$($fc:tt)*] [$($pool:tt)*] #[from] $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: a field has more than one of `#[from]`, `#[source]`, `#[location]`, `#[retry_after]`; `#[from]` already implies `#[source]`" }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [] [$($pool:tt)*] #[source] $($rest:tt)*) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [$($fc:tt)*] [$($pool:tt)*] #[source] $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: a field has more than one of `#[from]`, `#[source]`, `#[location]`, `#[retry_after]`; `#[from]` already implies `#[source]`" }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [] [$($pool:tt)*] #[location] $($rest:tt)*) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [$($fc:tt)*] [$($pool:tt)*] #[location] $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: a field has more than one of `#[from]`, `#[source]`, `#[location]`, `#[retry_after]`" }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [] [$($pool:tt)*] #[retry_after] $($rest:tt)*) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)+] [$($fc:tt)*] [$($pool:tt)*] #[retry_after] $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: a field has more than one of `#[from]`, `#[source]`, `#[location]`, `#[retry_after]`" }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] [$($pool:tt)*] #[$($a:tt)*] $($rest:tt)*) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] #[$($a:tt)*] $($rest:tt)*) => {
         ::core::compile_error! {
-            "define_errors!: unknown attribute on a field; valid here are doc comments, `#[from]`, `#[source]`, `#[location]`, and `#[retry_after]`"
+            "define_errors!: unknown attribute on a field; valid here are doc comments, `#[cfg]`, `#[from]`, `#[source]`, `#[location]`, and `#[retry_after]`"
         }
     };
 
     // A named field: `name: Type` (braced), `binding: Type` (tuple). An
     // unmarked field is `plain`.
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$($pool:tt)*]
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [$($fc:tt)*] [$($pool:tt)*]
         $fv:vis $n:ident : $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)* { [$($fa)*] [$fv] plain $n : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)* { [$($fa)*] [$fv] [$($fc)*] plain $n : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$role:ident] [] [$($pool:tt)*]
         $fv:vis $n:ident : $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)* { [$($fa)*] [$fv] $role $n : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f $kind [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] $role $n : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+    };
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$role:ident] [$($fc:tt)+] [$($pool:tt)*] $($rest:tt)*) => {
+        ::core::compile_error! { "define_errors!: `#[cfg]` works on plain fields; a field marked `#[from]`, `#[source]`, `#[location]`, or `#[retry_after]` cannot be compiled out" }
     };
 
     // An unnamed tuple field: sources, locations, and retry delays get a
@@ -636,23 +655,23 @@ macro_rules! __define_err_fields {
     // next of the 16 names the caller passed in.
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [from] [] [$($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] from __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] from __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [source] [] [$($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] source __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] source __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [location] [] [$($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] location __define_err_location : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] location __define_err_location : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [retry_after] [] [$($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] retry_after __define_err_retry_after : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] retry_after __define_err_retry_after : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] plain $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] plain $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] []
         $($rest:tt)+) => {
@@ -669,13 +688,13 @@ macro_rules! __define_err_fields {
     (@f $kind:ident [struct [$($ctx:tt)*] [$($tattr:tt)*] [$($meta:tt)*] ($vis:vis) $name:ident tuple $msg:tt] [$($done:tt)*] [] [] [] [$($pool:tt)*]) => {
         $crate::__define_err_emit! { @struct [$($ctx)*] [$($tattr)*] [$($meta)*] ($vis) $name ( $($done)* ) => $msg }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] [$($pool:tt)*]) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*]) => {
         ::core::compile_error! { "define_errors!: attributes after the last field belong to no field" }
     };
-    (@f braced [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] [$($pool:tt)*] $($rest:tt)+) => {
+    (@f braced [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] $($rest:tt)+) => {
         ::core::compile_error! { "define_errors!: expected a field `name: Type` in a braced variant or struct" }
     };
-    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] [$($pool:tt)*] $($rest:tt)+) => {
+    (@f $kind:ident [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [$($fc:tt)*] [$($pool:tt)*] $($rest:tt)+) => {
         ::core::compile_error! { "define_errors!: expected a tuple field `binding: Type` or `Type`" }
     };
 }

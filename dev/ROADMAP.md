@@ -46,13 +46,15 @@ Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_
 - [x] Edge cases E-33 to E-64, E-87 to E-89 (`tests/define_meta.rs`, `tests/edge_codes.rs`, unit tests, UI cases).
 - [x] Exit: the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; `DIS-00001` displays with five digits, also through the probe (D-033).
 
-## v0.5.0 - Feature complete: facade and record
+## v0.5.0 - Feature complete: facade and record (DONE, 2026-11-02)
 API: FAC-01 to FAC-18, FAC-20, FAC-21, REC-01 to REC-07, TST-01, TST-02, DEF-24.
 Exit: every P0, P1, and P2 item exists; a prototype L7 reporter (in a test) receives every verb with correct locations.
-- [ ] Reporter slot with loom models and Miri; control word; verbs; once-per-site flags and table; reentrancy and panic isolation (loom CI job added).
-- [ ] `ErrorRecord` with limits and the bounded writer.
-- [ ] `docs/FACADE.md`, `docs/MIGRATION.md`, `docs/CODES.md`, `examples/`.
-- [ ] Edge cases E-65 to E-86, E-90 to E-95.
+- [x] Reporter slot with loom models and Miri; control word; verbs; once-per-site flags and table; reentrancy and panic isolation (loom CI job added).
+- [x] `ErrorRecord` with limits and the bounded writer; fuzz target `record_from_chain`.
+- [x] `#[cfg]` on variants and fields (DEF-24, D-045); the probe carries the public message (D-044).
+- [x] `docs/FACADE.md`, `docs/MIGRATION.md`, `docs/CODES.md`, `examples/`.
+- [x] Edge cases E-65 to E-86, E-90 to E-95 (`tests/facade*.rs`, `tests/record*.rs`, unit tests; E-86 by `examples/no_std` on `thumbv6m`).
+- [x] Exit: `tests/facade.rs`'s recording reporter receives every verb with correct locations.
 
 ## v0.6.0 - Optimisation
 Exit: `docs/PERFORMANCE.md` published with dates, hardware, and method.

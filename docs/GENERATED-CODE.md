@@ -135,9 +135,15 @@ impl ::core::error::Error for PageError {
     fn description(&self) -> &str {
         match self {
             Self::NotFound { .. } => {
-                const B: &$crate::__private::ProbeBuf = &$crate::__private::ProbeBuf::new(
-                    ::core::option::Option::None, 17, 2, 1, 0,
+                const P: ::core::option::Option<&str> = ::core::option::Option::None;
+                const L: usize = $crate::__private::probe_len(
                     ::core::concat!(::core::stringify!(PageError), "::", ::core::stringify!(NotFound)),
+                    P,
+                );
+                const B: &$crate::__private::ProbeBuf<L> = &$crate::__private::ProbeBuf::new(
+                    ::core::option::Option::None, 17, 2, 1, false,
+                    ::core::concat!(::core::stringify!(PageError), "::", ::core::stringify!(NotFound)),
+                    P,
                 );
                 const S: &str = B.as_str();
                 S
@@ -310,7 +316,7 @@ impl ::core::error::Error for AppError {
         match self {
             Self::Config(inner) => $crate::__private::forward_probe(
                 $crate::__private::description_of!(inner),
-                { const B: &$crate::__private::ProbeBuf = &/* own probe, flags = 0x02 */; const S: &str = B.as_str(); S },
+                { /* own probe, built as in expansion 1 with `transparent` true */ },
             ),
             // Other: the same shape
             # _ => ::core::unreachable!(),
@@ -642,7 +648,7 @@ define_errors! {
 }
 ```
 
-Every arm generated for `Tls` in every impl (`Display`, `source`, `description`, each `ErrorInfo` method, a `From` impl, a catalog entry, the duplicate check) carries the same `#[cfg(feature = "tls")]`, which is the user's own feature in the user's crate. This is the one place a `cfg` appears in generated code, and it is copied from the user's input, never added. Arrives in `0.5.0` (DEF-24).
+Every arm generated for `Tls` in every impl (`Display`, `source`, `description`, each `ErrorInfo` method, a `From` impl, a catalog entry, the duplicate check) carries the same `#[cfg(feature = "tls")]`, which is the user's own feature in the user's crate. This is the one place a `cfg` appears in generated code, and it is copied from the user's input, never added. A `#[cfg]` on a plain field of a braced variant or struct goes on the field and on its `ref` binding in each arm. On a tuple field, or on a field with a role, it is a compile error. Since `0.5.0` (DEF-24).
 
 ## `ErrorInfo` methods
 
@@ -677,15 +683,17 @@ Every method is generated for every type, as a `match` returning constants or co
 | 40 | 2 | flags in lowercase hex: bit 0 the variant has `#[public]`; bit 1 transparent; other bits zero |
 | 42 | 1 | `\|` |
 | 43 | 1 to 128 | type name, `Type::Variant` or `Type` (ASCII) |
+| then, with flag bit 0 | 1 | `\|` |
+| | 0 to 512 | the `#[public]` message (UTF-8), so `ErrorRecord` and the error service can read it through `&dyn Error` |
 
 Examples, from [`tests/golden/probe.txt`](../tests/golden/probe.txt) (`\0` is the NUL byte):
 
 ```text
-DbError::Timeout     \0DE13b34a2f2600000011104000000000000000101|DbError::Timeout
+DbError::Timeout     \0DE13b34a2f2600000011104000000000000000101|DbError::Timeout|The database is busy. Try again shortly.
 PageError::NotFound  \0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound
 ```
 
-The probe is built by `__private::ProbeBuf::new` in a `const` item and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A type name longer than 128 bytes is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
+The probe is built by `__private::ProbeBuf::new` in a `const` item, exactly `__private::probe_len(name, public)` bytes long, and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A type name longer than 128 bytes or a public message longer than 512 is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
 
 ## Compile-time checks
 
@@ -701,11 +709,12 @@ The rule: a `panic!` may only be reachable in constant evaluation, where it is a
 | docs template contains `{code}`, `{namespace}`, or `{number}` | `__private::check_docs` | "define_errors!: the docs template needs {code}, {namespace}, or {number}" |
 | severity number 1 to 24 | `__private::severity::<N>()`, through `Severity::at::<N>()` | "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)" |
 | project kind bit below 32 | `Kinds::project::<N>()` | "Kinds::project: the bit must be below 32" |
-| type name at most 128 bytes, ASCII | `__private::ProbeBuf::new` | "define_errors!: a type or variant name is longer than 128 bytes" (or "... must be ASCII") |
+| type name at most 128 bytes, ASCII | `__private::probe_len`, `ProbeBuf::as_str` | "define_errors!: a type or variant name is longer than 128 bytes" (or "... must be ASCII") |
+| public message at most 512 bytes | `__private::probe_len` | "define_errors!: a public message is longer than 512 bytes" |
 
 `Severity::at::<N>()` and `Kinds::project::<N>()` check with an inline `const` block, which rustc evaluates when the function is monomorphized for a build. `cargo check` does not always reach that point; `cargo build` and `cargo test` do, and a use in a `const` item fails under `cargo check` too. Generated code uses both in `const` items.
 
-Rules the macro itself rejects with `compile_error!` (each names the fix, and each is reported once): `#[code]` without `help`, `#[code]` arguments out of order (`n`, `name`, `help`, `title`, `deprecated`, `replacement`), `#[code]` without a `namespace` header, a metadata attribute written twice on one variant, metadata on an enum instead of its variants, `#[retry_after(...)]` together with a `#[retry_after]` field, an unknown attribute in the metadata position (the message lists the valid ones), two source fields, two `#[location]` fields, two `#[retry_after]` fields, `#[from]` with fields other than the source and an optional `#[location]`, `transparent` with zero or two fields, a missing `=> message`, `#[exhaustive]` on a struct, and a non-literal code number.
+Rules the macro itself rejects with `compile_error!` (each names the fix, and each is reported once): `#[cfg]` on a tuple field or on a field marked `#[from]`, `#[source]`, `#[location]`, or `#[retry_after]`, `#[code]` without `help`, `#[code]` arguments out of order (`n`, `name`, `help`, `title`, `deprecated`, `replacement`), `#[code]` without a `namespace` header, a metadata attribute written twice on one variant, metadata on an enum instead of its variants, `#[retry_after(...)]` together with a `#[retry_after]` field, an unknown attribute in the metadata position (the message lists the valid ones), two source fields, two `#[location]` fields, two `#[retry_after]` fields, `#[from]` with fields other than the source and an optional `#[location]`, `transparent` with zero or two fields, a missing `=> message`, `#[exhaustive]` on a struct, and a non-literal code number.
 
 ## The `__private` surface
 
@@ -739,12 +748,13 @@ Rules the macro itself rejects with `compile_error!` (each names the fix, and ea
 | `check_block` | `const fn check_block(duplicate_message: &str, numbers: &[u32], retired: &[u32], replacements: &[&[(u32, u32)]])` | duplicates and replacements; panics in const evaluation | 0.4 |
 | `catalog_len`, `catalog` | `const fn catalog_len(parts: &[&[CodeInfo]]) -> usize`; `const fn catalog<const N: usize>(parts: &[&[CodeInfo]]) -> [CodeInfo; N]` | build a type's `CATALOG` from per-variant parts | 0.4 |
 | `check_docs` | `const fn check_docs(template: &str)` | the docs template has a placeholder | 0.4 |
-| `ProbeBuf` | `struct ProbeBuf`; `const fn new(code: Option<u64>, severity: u8, category: u8, kinds: u64, flags: u8, name: &str) -> ProbeBuf`; `const fn as_str(&self) -> &str` | builds the probe string at compile time | 0.4 |
+| `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong name or public message | 0.5 |
+| `ProbeBuf` | `struct ProbeBuf<const N: usize>`; `const fn new(code: Option<u64>, severity: u8, category: u8, kinds: u64, transparent: bool, name: &str, public: Option<&str>) -> ProbeBuf<N>`; `const fn as_str(&self) -> &str` | builds the probe string at compile time (`0.4`; const-sized, with the public message, `0.5`) | 0.4 |
 | `forward_probe` | `fn forward_probe<'a>(inner: &'a str, own: &'static str) -> &'a str` | transparent variants | 0.4 |
 | `platform_kinds` | module of `Kinds` constants `ERROR` to `TRIGGER` | glob-imported where `#[kinds]` is expanded | 0.4 |
 | `named_levels` | module of `Severity` constants `TRACE` to `FATAL` | glob-imported where `#[severity(NAME)]` is expanded | 0.4 |
 | `Site` | `struct Site`; `const fn new() -> Site` | once-per-site flag behind `warn!` and `deprecated!` | 0.5 |
-| verb helpers | `fn notice_args(kinds, Arguments, Location)`, `fn warn_site(&'static Site, kinds, Arguments, Location)`, `fn trigger_args(kinds, Arguments, Location)`, `fn deprecated_site(&'static Site, Arguments, Location)` | the expansion targets of `notice!`, `warn!`, `trigger!`, `deprecated!` | 0.5 |
+| verb helpers | `fn notice_args(kinds, Arguments, Location)`, `fn warn_ready(&Site) -> bool`, `fn warn_site(&Site, kinds, Arguments, Location)`, `fn trigger_args(kinds, Arguments, Location)`, `fn deprecated_site(&Site, Arguments, Location)` | the expansion targets of `notice!`, `warn!`, `trigger!`, `deprecated!`; `warn_ready` keeps a fired site from evaluating its arguments | 0.5 |
 
 Public items that generated code uses directly: `Code`, `Namespace`, `Severity`, `Category`, `Kinds`, `Action`, `CodeInfo` and its `const` `with_*` methods, `CodeState`, `ErrorInfo`, `Location`. These follow semantic versioning like any public item.
 

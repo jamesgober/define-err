@@ -1,0 +1,15 @@
+# Built for bare-metal targets in CI. A crate of its own because the main
+# package's dev-dependencies need `std`.
+[package]
+name    = "define-err-no-std-example"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+define-err = { path = "../..", default-features = false }
+
+[workspace]

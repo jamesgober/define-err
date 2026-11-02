@@ -122,6 +122,8 @@ jobs:
         run: cargo build --no-default-features --target ${{ matrix.target }}
       - name: Build (core + alloc)
         run: cargo build --no-default-features --features alloc --target ${{ matrix.target }}
+      - name: Build the no_std example
+        run: cargo build --manifest-path examples/no_std/Cargo.toml --target ${{ matrix.target }}
 
   miri:
     name: Miri
@@ -142,6 +144,18 @@ jobs:
         run: cargo miri test --no-default-features
         env:
           MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-disable-isolation"
+
+  loom:
+    name: Loom
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Loom models
+        run: cargo test --test loom --release
+        env:
+          RUSTFLAGS: "--cfg loom"
 
   fuzz:
     name: Fuzz targets build
