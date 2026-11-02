@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.3.0"
+version = "0.4.0"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and
@@ -78,6 +78,8 @@ thiserror = "2"
 trybuild = "1"
 # Benchmarks against thiserror and hand-written impls (benches/).
 criterion = { version = "0.5", default-features = false }
+# Property tests of every invariant (round trips, set laws, "never panics").
+proptest = { version = "1", default-features = false, features = ["std"] }
 
 
 # BENCHMARKS

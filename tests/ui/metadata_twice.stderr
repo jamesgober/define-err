@@ -1,0 +1,12 @@
+error: define_errors!: a metadata attribute is written twice or without its argument; each of `#[code]`, `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`, `#[action]`, `#[retryable]`, `#[retry_after]` is written at most once
+ --> tests/ui/metadata_twice.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum E {
+5 | |         #[category(Internal)]
+6 | |         #[category(Unavailable)]
+... |
+9 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_meta_slot` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -103,7 +103,7 @@ Costs are estimates (marked [est.]) until they are measured in `0.6.0`; measured
 
 ```toml
 [dependencies]
-define-err = "0.3.0"
+define-err = "0.4.0"
 ```
 
 ### Features
@@ -122,7 +122,7 @@ The crate is `#![no_std]`. `default-features = false` gives `core` only: every m
 
 ```toml
 [dependencies]
-define-err = { version = "0.3.0", default-features = false }
+define-err = { version = "0.4.0", default-features = false }
 ```
 
 MSRV is 1.81, the first release with `core::error::Error`.
@@ -331,7 +331,7 @@ assert!(err.source().is_none());
 
 ### Transparent wrapping
 
-`=> transparent` forwards `Display`, `source()`, every `ErrorInfo` method, and the identity probe to the only field (besides an optional `#[location]`). The wrapper adds nothing a reader of the error can see, which is what a crate wants when it re-exports another crate's errors under its own enum.
+`=> transparent` forwards `Display`, `source()`, every `ErrorInfo` method, and the identity probe to the only field (besides an optional `#[location]`). The wrapper adds nothing a reader of the error can see, which is what a crate wants when it re-exports another crate's errors under its own enum. When the inner type does not implement `ErrorInfo`, or has no probe, the variant answers with its own metadata attributes (or the defaults), so a transparent wrapper around a foreign error can still carry a code and a category.
 
 ```rust
 define_errors! {
@@ -398,9 +398,11 @@ retired = [<n>, ...];
 - `#[code(n, help = "...")]`: `n` is an integer literal from 0 to 16,777,215 (`1_000` and `0x2A` are accepted and display in decimal). Number 0 is the namespace's generic code. `help` is required: every code ships with what to do about it.
 - `name = TIMEOUT` adds the associated constant `DbError::TIMEOUT: Code`. Without it the code is reached through `err.code()` or the catalog.
 - `title` is the catalog title; it defaults to the variant name.
-- `deprecated = "2.1", replacement = 10`: the code keeps working, its catalog state is `Deprecated`, and the named constant carries `#[deprecated]`, so the compiler warns where it is used.
+- `deprecated = "2.1.0", replacement = 10`: the code keeps working, its catalog state is `Deprecated` (naming the replacement), and the named constant carries `#[deprecated]` with the note "this code is deprecated; its catalog entry names the replacement", so the compiler warns where it is used. The text is copied into `#[deprecated(since = ...)]`; write a full version (`"2.1.0"`), which is what clippy's `deprecated_semver` lint asks for.
+- The arguments go in this order: `n`, `name`, `help`, `title`, `deprecated`, `replacement`. Only `n` and `help` are required; another order is a compile error that shows the right one.
 - `docs`: a URL template; `{code}`, `{namespace}`, and `{number}` are replaced by [`CodeInfo::url`](#codeinfo). A template with none of them is a compile error.
-- `retired = [9, 12]`: numbers that were used once and must never return. They appear in the catalog as `Retired` and take part in the duplicate check.
+- `retired = [9, 12]`: numbers that were used once and must never return. They appear in the catalog of the block's first type as `Retired` and take part in the duplicate check.
+- The header lines may come in any order, each at most once, before the first type.
 
 Every number in a block is checked at compile time: a duplicate (including a retired number) is a compile error, and rustc marks the second literal.
 
@@ -420,7 +422,7 @@ define_errors! {
         #[category(DeadlineExceeded)]
         Timeout { after_ms: u64 } => "query timed out after {after_ms} ms",
 
-        #[code(4, help = "Use DB-0010 instead.", deprecated = "2.1", replacement = 10)]
+        #[code(4, help = "Use DB-0010 instead.", deprecated = "2.1.0", replacement = 10)]
         #[category(ResourceExhausted)]
         OldQuota => "quota exceeded",
 
@@ -457,7 +459,7 @@ assert_eq!(err.code().unwrap().to_string(), "DIS-00001");
 
 ### Metadata attributes
 
-Each is optional, goes on the variant (or the struct) it describes, and may appear in any order.
+Each is optional, goes on the variant (or the struct) it describes, and may appear in any order, at most once each. On an enum they go on the variants; metadata written on the enum itself is a compile error.
 
 | Attribute | Value | Default when absent |
 |---|---|---|
@@ -546,12 +548,14 @@ Misuse is a compile error that names the problem and the fix. Each has a `trybui
 |---|---|
 | `#[code]` without `help` | "`#[code]` needs `help = \"...\"`: every code ships with its explanation" |
 | `#[code]` without a `namespace` header | "`#[code]` needs a `namespace = \"...\";` line at the top of the block" |
+| `#[code]` arguments out of order | shows the order: `n`, `name`, `help`, `title`, `deprecated`, `replacement` |
+| a metadata attribute written twice, or metadata on an enum instead of its variants | names the attribute |
 | unknown attribute in the metadata position | names it and lists the valid ones |
 | number out of range, negative, a float, or not a literal | "a code number must be an integer literal from 0 to 16777215" |
 | duplicate number, or a retired number reused | "duplicate code number in namespace DB", and rustc marks the second literal |
 | invalid namespace (empty, longer than 6, a bad character, starts with a digit) | "namespace must be 1 to 6 letters or digits, starting with a letter" |
 | width outside 1 to 8 | "width must be from 1 to 8 digits" |
-| severity outside 1 to 24 or an unknown name | "severity must be from 1 to 24" / the unknown name is not found |
+| severity outside 1 to 24 or an unknown name | "a severity must be from 1 to 24" / the unknown name is not found |
 | unknown category, action, or kind name | the name is not found, at the name |
 | project kind bit 32 or more | "Kinds::project: the bit must be below 32" |
 | two source fields, two `#[location]` fields, two `#[retry_after]` fields | names the second one |
@@ -565,6 +569,8 @@ Misuse is a compile error that names the problem and the fix. Each has a `trybui
 | `replacement` pointing at itself or outside the block | "replacement must be another code defined in this block" |
 | `#[exhaustive]` on a struct | "`#[exhaustive]` applies only to enums" |
 | a variant or type name longer than 128 bytes | "a type or variant name is longer than 128 bytes" |
+
+Each mistake is reported once, at the place it was written. A numeric severity or project kind bit used outside the macro (`Severity::at::<30>()`, `Kinds::project::<40>()` in a function body) is checked when the function is built: `cargo build` and `cargo test` reject it, `cargo check` may not. In a `const` item both reject it.
 
 ### Limits
 
@@ -644,7 +650,7 @@ fn respond(err: &dyn ErrorInfo) -> (u16, &'static str) {
 }
 ```
 
-With `std`, `std::io::Error` implements `ErrorInfo`: `category()` is [`Category::from_io_kind`](#category) of its kind, and `kinds()` adds `RESOURCE` for storage kinds (`StorageFull`, `QuotaExceeded`, `OutOfMemory` where they exist). Since `0.4` (INF-04).
+With `std`, `std::io::Error` implements `ErrorInfo`: `category()` is [`Category::from_io_kind`](#category) of its kind, and `kinds()` adds `RESOURCE` for `OutOfMemory`. The storage kinds (`StorageFull`, `QuotaExceeded`) are newer than the MSRV and fall under `Unknown` until the MSRV reaches them. Since `0.4` (INF-04).
 
 ```rust
 use define_err::prelude::*;
@@ -996,7 +1002,7 @@ The gRPC canonical status codes without `OK`. A category decides how every trans
 | `may_retry_automatically` | `idempotent && self == Unavailable`: only an operation whose repeat causes no unintended change retries on its own |
 | `default_severity`, `default_action`, `default_public_message` | what a variant gets when it does not say |
 | `name`, `parse` | `snake_case` name; `parse` also accepts `SCREAMING_CASE` and `CamelCase` |
-| `from_io_kind` | `NotFound`, `PermissionDenied`, `AlreadyExists`, `InvalidInput`, `InvalidData`, `TimedOut`, `WouldBlock`, `Interrupted`, `OutOfMemory`, `Unsupported`, and the network kinds are mapped; any other kind is `Unknown` |
+| `from_io_kind` | `NotFound`, `PermissionDenied`, `AlreadyExists`, `TimedOut`, and `Unsupported` map to their namesakes; `InvalidInput` and `InvalidData` to `InvalidArgument`; `UnexpectedEof` to `OutOfRange`; `OutOfMemory` to `ResourceExhausted`; `AddrInUse` to `AlreadyExists`; `WouldBlock`, `Interrupted`, `WriteZero`, and the connection kinds to `Unavailable`; any other kind is `Unknown` |
 
 ```rust
 use define_err::Category;
@@ -1321,7 +1327,7 @@ pub struct Identity<'a> {
 }
 ```
 
-`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own.
+`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`DIS-00001`, not `DIS-0001`).
 
 ## `Secret<T>`
 
@@ -1606,7 +1612,7 @@ A run-time deprecation warning for anything that is not a Rust item (a configura
 
 ```rust
 if config.contains("pool.max") {
-    define_err::deprecated!("pool.max", since = "2.1", replacement = "pool.size");
+    define_err::deprecated!("pool.max", since = "2.1.0", replacement = "pool.size");
 }
 ```
 

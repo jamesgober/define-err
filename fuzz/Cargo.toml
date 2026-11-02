@@ -1,0 +1,51 @@
+[package]
+name = "define-err-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+define-err = { path = ".." }
+
+# Kept out of the crate's own workspace: the fuzz crate builds on nightly only.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "code_parse"
+path = "fuzz_targets/code_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "code_from_u64"
+path = "fuzz_targets/code_from_u64.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "severity_parse"
+path = "fuzz_targets/severity_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "category_parse"
+path = "fuzz_targets/category_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "probe_decode"
+path = "fuzz_targets/probe_decode.rs"
+test = false
+doc = false
+bench = false

@@ -1,11 +1,11 @@
 # define-err golden file: identity probe strings (dev/PLAN.md 7.11, docs/GENERATED-CODE.md). Frozen at 1.0.
-# '\0' in this file stands for the single byte 0x00 (NUL). Layout: magic (4) | code identity hex (16, or 16 'x')
+# '\0' in this file stands for the single byte 0x00 (NUL). Layout: magic (4) | code value hex, width included (16, or 16 'x')
 # | severity hex (2) | category gRPC number hex (2) | kinds hex (16) | flags hex (2; bit 0 public message, bit 1 transparent) | '|' | type name.
 # columns: case	probe
-DbError::Timeout (code DB-0001, DeadlineExceeded, public message)	\0DE13b34a2f2000000011104000000000000000101|DbError::Timeout
-DbError::Corrupt (code DB-0002, DataLoss, CRITICAL, ERROR|SECURITY)	\0DE13b34a2f200000002140f000000000000001100|DbError::Corrupt
-DbError::Quota (code DB-0010, ResourceExhausted, kinds project(0))	\0DE13b34a2f20000000a1108000000010000000000|DbError::Quota
-DistroError::Config (code DIS-00001, InvalidArgument)	\0DE13c133b92000000010d03000000000000000100|DistroError::Config
+DbError::Timeout (code DB-0001, DeadlineExceeded, public message)	\0DE13b34a2f2600000011104000000000000000101|DbError::Timeout
+DbError::Corrupt (code DB-0002, DataLoss, CRITICAL, ERROR|SECURITY)	\0DE13b34a2f260000002140f000000000000001100|DbError::Corrupt
+DbError::Quota (code DB-0010, ResourceExhausted, kinds project(0))	\0DE13b34a2f26000000a1108000000010000000000|DbError::Quota
+DistroError::Config (code DIS-00001, InvalidArgument)	\0DE13c133b92800000010d03000000000000000100|DistroError::Config
 PageError::NotFound (plain: no code, no category)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound
 AppError::Other (transparent over a foreign type)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000102|AppError::Other
 Cancelled (unit struct, plain)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|Cancelled

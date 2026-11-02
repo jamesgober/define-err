@@ -1,0 +1,5 @@
+error[E0599]: no variant, associated function, or constant named `Broken` found for enum `Category` in the current scope
+ --> tests/ui/unknown_category.rs:5:20
+  |
+5 |         #[category(Broken)]
+  |                    ^^^^^^ variant, associated function, or constant not found in `Category`

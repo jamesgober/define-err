@@ -1,0 +1,20 @@
+error[E0080]: evaluation panicked: define_errors!: the docs template needs {code}, {namespace}, or {number}
+  --> tests/ui/docs_without_placeholder.rs:3:1
+   |
+ 3 | / define_errors! {
+ 4 | |     namespace = "DB";
+ 5 | |     docs = "https://docs.hivedb.com/errors";
+ 6 | |     pub enum E {
+...  |
+10 | | }
+   | |_^ evaluation of `_` failed inside this call
+   |
+note: inside `define_err::__private::check_docs`
+  --> $RUST/core/src/panic.rs
+   |
+   = note: the failure occurred here
+   |
+  ::: src/private.rs
+   |
+   |     panic!("define_errors!: the docs template needs {{code}}, {{namespace}}, or {{number}}");
+   |     ---------------------------------------------------------------------------------------- in this macro invocation

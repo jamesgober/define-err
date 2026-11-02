@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `BILLING` in this scope
+ --> tests/ui/unknown_kind.rs:5:25
+  |
+5 |         #[kinds(ERROR | BILLING)]
+  |                         ^^^^^^^ not found in this scope

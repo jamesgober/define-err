@@ -1,0 +1,23 @@
+error[E0080]: evaluation panicked: define_errors!: namespace must be 1 to 6 letters or digits, starting with a letter, for example "DB"
+ --> tests/ui/bad_namespace.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     namespace = "1DB";
+5 | |     pub enum E {
+6 | |         #[code(1, help = "x")]
+... |
+9 | | }
+  | |_^ evaluation of `_` failed inside this call
+  |
+note: inside `define_err::__private::namespace`
+ --> $RUST/core/src/panic.rs
+  |
+  = note: the failure occurred here
+  |
+ ::: src/private.rs
+  |
+  |           Err(_) => panic!(
+  |  ___________________-
+  | |             "define_errors!: namespace must be 1 to 6 letters or digits, starting with a letter, for example \"DB\""
+  | |         ),
+  | |_________- in this macro invocation

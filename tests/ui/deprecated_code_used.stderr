@@ -1,0 +1,11 @@
+error: use of deprecated associated constant `E::OLD`: this code is deprecated; its catalog entry names the replacement
+  --> tests/ui/deprecated_code_used.rs:16:16
+   |
+16 |     let _ = E::OLD;
+   |                ^^^
+   |
+note: the lint level is defined here
+  --> tests/ui/deprecated_code_used.rs:1:9
+   |
+ 1 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

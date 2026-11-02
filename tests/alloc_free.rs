@@ -8,7 +8,7 @@ use std::{
     fmt::Write as _,
 };
 
-use define_err::{define_errors, prelude::*};
+use define_err::{define_errors, identify, prelude::*, Namespace};
 
 struct Counting;
 
@@ -99,4 +99,54 @@ fn test_construction_display_source_info_allocate_nothing() {
         text,
         "page 7 of \"data\" not found|i/o: an error occurred when formatting an argument|token   [redacted]|inner 3|[redacted]"
     );
+}
+
+define_errors! {
+    namespace = "DB";
+
+    pub enum Coded {
+        #[code(42, help = "Raise pool.size.")]
+        #[category(DeadlineExceeded)]
+        #[kinds(ERROR | SECURITY)]
+        Timeout { after_ms: u64 } => "query timed out after {after_ms} ms",
+    }
+}
+
+#[test]
+fn test_codes_metadata_and_probe_allocate_nothing() {
+    let mut buffer = Buffer {
+        bytes: [0; 256],
+        len: 0,
+    };
+    let count = allocations_during(|| {
+        let err = Coded::Timeout { after_ms: 5 };
+        let code = err.code().unwrap();
+        write!(
+            buffer,
+            "{code}|{}|{}|{}|",
+            err.severity(),
+            err.category(),
+            err.kinds()
+        )
+        .unwrap();
+        let parsed = Code::parse("DB-0042").unwrap();
+        assert_eq!(parsed, code);
+        assert_eq!(Code::from_u64(code.as_u64()), Some(code));
+        let _ = Namespace::try_new("DB").unwrap().as_str();
+        let identity = identify(&err).unwrap();
+        assert_eq!(identity.code, Some(code));
+        let _ = err.code_info().unwrap().url();
+        let _ = (
+            err.public_message(),
+            err.help(),
+            err.action(),
+            err.is_retryable(),
+            err.retry_after(),
+        );
+        let _ = Severity::parse("warn");
+        let _ = Category::parse("not_found");
+    });
+    assert_eq!(count, 0);
+    let text = std::str::from_utf8(&buffer.bytes[..buffer.len]).unwrap();
+    assert_eq!(text, "DB-0042|ERROR|deadline_exceeded|ERROR|SECURITY|");
 }

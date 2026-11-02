@@ -1,0 +1,23 @@
+error[E0080]: evaluation panicked: Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)
+ --> $RUST/core/src/panic.rs
+  |
+  = note: evaluation of `define_err::Severity::at::<0>::{constant#0}` failed here
+  |
+ ::: src/severity.rs
+  |
+  | /             assert!(
+  | |                 N >= 1 && N <= 24,
+  | |                 "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)"
+  | |             )
+  | |_____________- in this macro invocation
+
+note: erroneous constant encountered
+ --> src/severity.rs
+  |
+  | /         const {
+  | |             assert!(
+  | |                 N >= 1 && N <= 24,
+  | |                 "Severity::at: a severity must be from 1 to 24 (OpenTelemetry SeverityNumber)"
+  | |             )
+  | |         };
+  | |_________^

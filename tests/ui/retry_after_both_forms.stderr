@@ -1,0 +1,12 @@
+error: define_errors!: a variant has both `#[retry_after(...)]` and a `#[retry_after]` field; keep one
+ --> tests/ui/retry_after_both_forms.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum E {
+5 | |         #[retry_after(secs = 1)]
+6 | |         A { #[retry_after] wait: core::time::Duration } => "a",
+7 | |     }
+8 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_value` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
