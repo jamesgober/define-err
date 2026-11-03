@@ -73,6 +73,9 @@ fn test_probe_never_carries_display_text() {
 }
 
 proptest! {
+    // Miri runs this about ten thousand times slower.
+    #![proptest_config(ProptestConfig::with_cases(if cfg!(miri) { 4 } else { 256 }))]
+
     /// T2: no format spec shows the value. The value has no lowercase
     /// letters, so it cannot match part of `[redacted]` by chance.
     #[test]
