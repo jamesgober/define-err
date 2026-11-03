@@ -56,7 +56,7 @@ Exit: every P0, P1, and P2 item exists; a prototype L7 reporter (in a test) rece
 - [x] Edge cases E-65 to E-86, E-90 to E-95 (`tests/facade*.rs`, `tests/record*.rs`, unit tests; E-86 by `examples/no_std` on `thumbv6m`).
 - [x] Exit: `tests/facade.rs`'s recording reporter receives every verb with correct locations.
 
-## v0.6.0 - Optimisation (DONE, 2026-11-02)
+## v0.6.0 - Optimisation (DONE, 2026-11-03)
 Exit: `docs/PERFORMANCE.md` published with dates, hardware, and method.
 - [x] Benchmarks of `PLAN.md` 11.2 against thiserror, `log`, and error-forge; build-time comparison script.
 - [x] Assembly inspection of the empty facade path (one load and a branch).

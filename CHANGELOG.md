@@ -13,7 +13,7 @@
 
 ---
 
-## [0.6.0] - 2026-11-02
+## [0.6.0] - 2026-11-03
 
 Optimisation. Every target in `dev/PLAN.md` 11.1 is met or has a reviewed
 reason in the decision log (D-060). No public API changes.

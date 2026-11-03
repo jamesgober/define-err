@@ -183,10 +183,11 @@ mod tests {
     #[test]
     fn test_key_has_no_collision_in_a_large_set() {
         extern crate std;
+        let (files, lines) = if cfg!(miri) { (2, 16) } else { (64, 512) };
         let mut keys = std::collections::HashSet::new();
-        for file in 0..64 {
+        for file in 0..files {
             let name = std::format!("crates/app/src/module_{file}/mod.rs");
-            for line in 1..=512 {
+            for line in 1..=lines {
                 for column in [1, 5, 9, 13, 17, 21, 25, 29] {
                     assert!(keys.insert(key(&name, line, column)));
                 }
