@@ -65,7 +65,7 @@ Exit: `docs/PERFORMANCE.md` published with dates, hardware, and method.
 ## v0.7.0 - Hardening
 Exit: no open fuzz finding; every threat has a passing attack test.
 - [ ] Every fuzz target 24 hours; attack tests T1 to T17; Miri over the suite; loom models complete; 8-hour soak.
-- [ ] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
+- [x] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
 
 ## v0.8.0 - Alpha: first migrations
 Exit: each migrated crate's CI is green on its own repository against the published 0.8.0.

@@ -1,6 +1,6 @@
 # define-err performance
 
-Every target in `dev/PLAN.md` 11.1, what was measured, and how. Measured on 2026-11-02 against version `0.6.0`. A number here is a measurement on the machine below, not a promise for yours.
+Every target in `dev/PLAN.md` 11.1, what was measured, and how. Measured on 2026-11-02 against version `0.6.0`; the paths 0.7 changed were measured again on 2026-11-03, see [What 0.7 changed](#what-07-changed). A number here is a measurement on the machine below, not a promise for yours.
 
 ## Summary
 
@@ -61,12 +61,12 @@ python tools/build-time/compare.py --runs 10
 | verb with nothing installed | one load, under 1 ns | 0.27 to 0.51 ns | 0.35 to 0.68 ns | | **met** |
 | the same, 20% faster than `log::warn!` at `Off` | 20% faster | 0.33 ns for `log` | 0.34 ns for `log` | `log` 0.4 | **missed**: parity |
 | `warn!` after its first delivery | under 2 ns | 0.50 ns | 0.65 ns | | **met** |
-| `warn()` after first delivery | under 5 ns | 9.5 ns | 16 ns | | **missed** |
-| `report` filtered by severity | under 3 ns | 5.9 ns | 6.2 ns | `log::warn!` filtered 0.34 ns | **missed** |
-| `report_with` filtered | | 0.72 ns | 0.91 ns | | |
-| `report` to a no-op reporter | under 10 ns plus the call | 33 ns | 49 ns | `log::error!` 3.5 ns | **missed** |
-| `report` of a foreign error, delivered | | 10 ns | 15 ns | | |
-| `notice` to a no-op reporter | | 6.2 ns | 7.8 ns | `log::error!` 3.5 ns | |
+| `warn()` after first delivery | under 5 ns | 7.0 ns | 16 ns | | **missed** |
+| `report` filtered by severity | under 3 ns | 5.7 ns | 6.2 ns | `log::warn!` filtered 0.34 ns | **missed** |
+| `report_with` filtered | | 0.64 ns | 0.91 ns | | |
+| `report` to a no-op reporter | under 10 ns plus the call | 31 ns | 49 ns | `log::error!` 2.9 ns | **missed** |
+| `report` of a foreign error, delivered | | 10.7 ns | 15 ns | | |
+| `notice` to a no-op reporter | | 5.1 ns | 7.8 ns | `log::error!` 2.9 ns | |
 | `identify`, generated type | under 10 ns | 26 ns | 29 ns | | **missed** |
 | `identify`, foreign type | under 2 ns | 1.8 ns | 2.1 ns | | **met** |
 | `ErrorRecord::from_error`, three levels | under 1 us, allocations published | | 645 ns; one level 394 ns; clone 210 ns | none | **met**: 7 allocations for three foreign levels, 4 for one generated level, pinned in `tests/alloc_free.rs` |
@@ -90,6 +90,20 @@ Criterion means at the same load. The first column was built with this crate's f
 | `identify`, generated | 51 ns | 29 ns |
 | `identify`, foreign | 8.1 ns | 2.1 ns |
 | `Code` `Display` | 73 ns | 39 ns |
+
+### What 0.7 changed
+
+0.7 reads an error's probe inside the panic guard, because `description()` is the error's own code and may panic (D-062 in `dev/PLAN.md`). Floors of `0.6.0` and `0.7.0` built and run in turn, four rounds each, at a load average above 100; the median of each is shown, and the floors in the table above are 0.7's best. Means were not run again.
+
+| Path | 0.6.0 | 0.7.0 | Why |
+|---|---|---|---|
+| `report` filtered | 5.4 ns | 5.8 ns | the severity read is inside `catch_unwind` |
+| `report` of a foreign error, delivered | 9.4 ns | 10.9 ns | the same |
+| `report` to a no-op reporter | 33.2 ns | 32.3 ns | noise |
+| `warn()` after first delivery | 9.3 ns | 7.1 ns | code layout around the guard |
+| `notice` to a no-op reporter | 5.8 ns | 5.3 ns | the same |
+
+Reading the probe outside the guard would win back the half nanosecond and let a `description()` that reports itself recurse without limit.
 
 ## Build times
 
@@ -146,10 +160,10 @@ Each has a reviewed reason (D-060 in `dev/PLAN.md`) and goes back on the list in
 |---|---|---|
 | verb 20% faster than `log` at `Off` | parity | Both are one load and a branch. There is nothing left to remove. |
 | `Code` `Display` under 20 ns | 28 ns | `str::from_utf8` is the one safe way to a `&str`, and `unsafe` stays in one module. Half the cost of the `format!` it replaces, with no allocation. |
-| `warn()` under 5 ns | 9.5 ns | A function has no per-site static, so the site is found by hashing its file, line, and column. The key is by content because the compiler may emit one location twice. `warn!` is exact and costs 0.5 ns, and is the one to use in a hot loop. |
-| `report` filtered under 3 ns | 5.9 ns | A call and a virtual call come before the two digits it reads. `report_with` knows its severity and costs 0.72 ns. |
+| `warn()` under 5 ns | 7.0 ns | A function has no per-site static, so the site is found by hashing its file, line, and column. The key is by content because the compiler may emit one location twice. `warn!` is exact and costs 0.5 ns, and is the one to use in a hot loop. |
+| `report` filtered under 3 ns | 5.7 ns | A call, the panic guard, and a virtual call come before the two digits it reads. `report_with` knows its severity and costs 0.64 ns. |
 | `identify` generated under 10 ns | 26 ns | The probe is text from a `&dyn Error` that may be hostile, so every field is validated: 38 hex digits, the code's layout, severity and category ranges, every byte of the name. |
-| `report` to a no-op under 10 ns | 33 ns | The same validation, once per event. Decoding lazily would look better here and only move the cost to any reporter that reads the code. |
+| `report` to a no-op under 10 ns | 31 ns | The same validation, once per event. Decoding lazily would look better here and only move the cost to any reporter that reads the code. |
 | rebuild no slower than thiserror | 0.2 s slower on Linux | A macro expansion re-runs on every build, and a declarative macro produces more text than a derive. The plain arm halved it for enums without metadata (D-059). |
 
 The 500-variant enum meets its target of under 1 s of expansion, but is still almost twice thiserror's total. Both this and the rebuild come from work per variant, which is the first item in the polish pass.

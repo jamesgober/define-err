@@ -19,7 +19,12 @@
 
 ### Fixed
 
-- A panic in a reported error's own `description()` is contained like a panic in `receive`, and counted in `stats().reporter_panics`. It used to unwind into the caller of `report`, `report_with`, or `soft`.
+- A panic in a reported error's own `description()` is contained like a panic in `receive`, and counted in `stats().reporter_panics`. It used to unwind into the caller of `report`, `report_with`, or `soft`. Cost: a filtered `report` takes about 0.4 ns more, a delivered report of a foreign error about 1.5 ns more; `docs/PERFORMANCE.md` has the figures.
+
+### Changed
+
+- The panic guard checks and sets its flag in one thread-local access.
+- `benches/baseline.txt` holds 0.7.0's floors.
 
 ---
 

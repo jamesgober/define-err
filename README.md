@@ -172,7 +172,7 @@ fn main() {
 
 Errors are values in Rust; there is no throw event. The facade sees an error only when code calls one of its verbs. It cannot see an error discarded with `let _ =`, `.ok()`, or `unwrap_or`, or a typed error that is built and never reported.
 
-Measured costs, against thiserror, `log`, and error-forge, are in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md). See [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to the other error libraries (dynamic errors, rendering, diagnostics, the error service), and the decision log.
+Measured costs, against thiserror, `log`, and error-forge, are in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md). The threat model, each defence with its cost and its test, and what is not defended are in [`docs/SECURITY.md`](./docs/SECURITY.md); how the crate is built is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), and what differs by target and feature in [`docs/PLATFORM-NOTES.md`](./docs/PLATFORM-NOTES.md). See [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to the other error libraries (dynamic errors, rendering, diagnostics, the error service), and the decision log.
 
 ## Features
 
