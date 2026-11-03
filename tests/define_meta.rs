@@ -418,3 +418,47 @@ fn test_hand_written_catalog_entries() {
     assert_eq!(ENTRY.severity, Severity::ERROR);
     assert!(catalog::find(&[&[ENTRY]], define_err::code!("PROTO", 1)).is_some());
 }
+
+mod arms {
+    use define_err::define_errors;
+
+    define_errors! {
+        pub enum Plain {
+            Busy => "the table is busy",
+        }
+    }
+
+    // A namespace sends this one through the general arm.
+    define_errors! {
+        namespace = "TW";
+
+        pub enum General {
+            Busy => "the table is busy",
+        }
+    }
+}
+
+/// The plain arm leaves out what the trait defaults give; both arms must answer
+/// the same.
+#[test]
+fn test_plain_arm_answers_as_the_general_arm_does() {
+    let (plain, general) = (arms::Plain::Busy, arms::General::Busy);
+    assert_eq!(plain.code(), general.code());
+    assert_eq!(plain.code_info().is_none(), general.code_info().is_none());
+    assert_eq!(plain.category(), general.category());
+    assert_eq!(plain.severity(), general.severity());
+    assert_eq!(plain.kinds(), general.kinds());
+    assert_eq!(plain.public_message(), general.public_message());
+    assert_eq!(plain.help(), general.help());
+    assert_eq!(plain.action(), general.action());
+    assert_eq!(plain.is_retryable(), general.is_retryable());
+    assert_eq!(plain.retry_after(), general.retry_after());
+    assert_eq!(plain.location(), general.location());
+    assert_eq!(plain.type_name(), "Plain::Busy");
+    assert_eq!(general.type_name(), "General::Busy");
+    assert_eq!(
+        plain.description().replace("Plain", "General"),
+        general.description()
+    );
+    assert_eq!(identify(&plain).unwrap().severity, general.severity());
+}

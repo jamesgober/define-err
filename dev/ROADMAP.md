@@ -56,11 +56,11 @@ Exit: every P0, P1, and P2 item exists; a prototype L7 reporter (in a test) rece
 - [x] Edge cases E-65 to E-86, E-90 to E-95 (`tests/facade*.rs`, `tests/record*.rs`, unit tests; E-86 by `examples/no_std` on `thumbv6m`).
 - [x] Exit: `tests/facade.rs`'s recording reporter receives every verb with correct locations.
 
-## v0.6.0 - Optimisation
+## v0.6.0 - Optimisation (DONE, 2026-11-03)
 Exit: `docs/PERFORMANCE.md` published with dates, hardware, and method.
-- [ ] Benchmarks of `PLAN.md` 11.2 against thiserror, `log`, and error-forge; build-time comparison script.
-- [ ] Assembly inspection of the empty facade path (one load and a branch).
-- [ ] Every target in 11.1 met or a reviewed reason recorded.
+- [x] Benchmarks of `PLAN.md` 11.2 against thiserror, `log`, and error-forge; build-time comparison script.
+- [x] Assembly inspection of the empty facade path (one load and a branch).
+- [x] Every target in 11.1 met or a reviewed reason recorded (D-060).
 
 ## v0.7.0 - Hardening
 Exit: no open fuzz finding; every threat has a passing attack test.
@@ -80,7 +80,8 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.
 - [ ] **Pre-1.0 polish pass**, in `0.9.x` and before any 1.0 release candidate (James's standing rule: go back and fix any issues and tune performance before getting close to release):
   - revisit every accepted gap, deferred item, known issue, and missed target recorded in `PLAN.md` section 20 and in this roadmap, and fix it or record why it stays;
-  - a fresh performance tuning pass against `PLAN.md` 11.1, with new measurements in `docs/PERFORMANCE.md`;
+  - a fresh performance tuning pass against `PLAN.md` 11.1, with new measurements in `docs/PERFORMANCE.md`, on a quiet machine: the 0.6 numbers were taken at a load average of 47;
+  - the misses reviewed in D-060, the incremental rebuild and the 500-variant enum first: cut the per-variant work for a type with metadata as D-059 did for a plain one;
   - re-run the security review (threats T1 to T17, attack tests, fuzz) and the edge-case review (E-1 to E-100 plus every case added since).
   Nothing accepted earlier in the series becomes final silently: whatever is still open goes into the 1.0 readiness note for James.
 - [ ] Release candidates `0.9.x` until no API change is needed for two weeks of use.

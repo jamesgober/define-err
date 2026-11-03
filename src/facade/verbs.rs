@@ -37,8 +37,17 @@ fn error_event<'a>(verb: Verb, error: &'a (dyn Error + 'static), location: Locat
     event
 }
 
-/// Delivers a report after the `is_ready` check.
+/// Delivers a report after the `is_ready` check. A minimum severity is
+/// checked from the probe's two digits first, so dropping an event does not
+/// decode the rest.
 fn report_ready(word: Word, error: &(dyn Error + 'static), location: Location) {
+    if state::has_minimum(word)
+        && probe::stated_severity(error)
+            .and_then(Severity::new)
+            .is_some_and(|severity| state::below_minimum(word, severity))
+    {
+        return;
+    }
     let event = error_event(Verb::Report, error, location);
     if state::passes(word, event.severity, event.kinds) {
         deliver(word, &event);
@@ -130,8 +139,7 @@ pub fn report_record(record: &ErrorRecord) {
     }
 }
 
-/// Delivers a message event.
-#[inline]
+/// Delivers a message event, after the `is_ready` check.
 fn message_ready(
     word: Word,
     verb: Verb,
@@ -149,8 +157,29 @@ fn message_ready(
     }
 }
 
-/// `notice!`'s target, and the functions'.
+/// `message_ready` for plain text. Out of line, so the inline gate of a verb
+/// sets up nothing before its load.
+fn text_ready(
+    word: Word,
+    verb: Verb,
+    severity: Severity,
+    kinds: Kinds,
+    text: &str,
+    location: Location,
+) {
+    message_ready(
+        word,
+        verb,
+        severity,
+        kinds,
+        format_args!("{text}"),
+        location,
+    );
+}
+
+/// `notice!`'s target.
 #[doc(hidden)]
+#[inline]
 pub fn notice_args(kinds: Kinds, args: fmt::Arguments<'_>, location: Location) {
     let word = state::load();
     if state::is_ready(word) {
@@ -176,7 +205,7 @@ pub fn notice_args(kinds: Kinds, args: fmt::Arguments<'_>, location: Location) {
 #[track_caller]
 #[inline]
 pub fn notice(message: &str) {
-    notice_args(Kinds::NONE, format_args!("{message}"), here());
+    notice_with(Kinds::NONE, message);
 }
 
 /// [`notice`] with more kinds.
@@ -189,7 +218,17 @@ pub fn notice(message: &str) {
 #[track_caller]
 #[inline]
 pub fn notice_with(kinds: Kinds, message: &str) {
-    notice_args(kinds, format_args!("{message}"), here());
+    let word = state::load();
+    if state::is_ready(word) {
+        text_ready(
+            word,
+            Verb::Notice,
+            Severity::NOTICE,
+            Kinds::NOTICE | kinds,
+            message,
+            here(),
+        );
+    }
 }
 
 /// How a warning remembers its call site.
@@ -244,6 +283,28 @@ pub fn warn_ready(site: &Site) -> bool {
     state::is_ready(word) && (state::mode(word) == WarnMode::Always || !state::site_has_fired(site))
 }
 
+/// `warn`'s slow path, out of line for the reason `text_ready` is.
+fn warn_text(kinds: Kinds, message: &str, location: Location) {
+    warning(
+        Verb::Warn,
+        Kinds::WARNING | kinds,
+        format_args!("{message}"),
+        location,
+        Memory::Table,
+    );
+}
+
+/// `deprecated`'s slow path.
+fn deprecated_text(item: &str, location: Location) {
+    warning(
+        Verb::Deprecated,
+        Kinds::DEPRECATED | Kinds::WARNING,
+        format_args!("`{item}` is deprecated"),
+        location,
+        Memory::Table,
+    );
+}
+
 /// `warn!`'s target.
 #[doc(hidden)]
 pub fn warn_site(site: &Site, kinds: Kinds, args: fmt::Arguments<'_>, location: Location) {
@@ -285,13 +346,7 @@ pub fn deprecated_site(site: &Site, args: fmt::Arguments<'_>, location: Location
 #[track_caller]
 #[inline]
 pub fn warn(message: &str) {
-    warning(
-        Verb::Warn,
-        Kinds::WARNING,
-        format_args!("{message}"),
-        here(),
-        Memory::Table,
-    );
+    warn_with(Kinds::NONE, message);
 }
 
 /// [`warn`] with more kinds.
@@ -304,17 +359,14 @@ pub fn warn(message: &str) {
 #[track_caller]
 #[inline]
 pub fn warn_with(kinds: Kinds, message: &str) {
-    warning(
-        Verb::Warn,
-        Kinds::WARNING | kinds,
-        format_args!("{message}"),
-        here(),
-        Memory::Table,
-    );
+    if state::is_ready(state::load()) {
+        warn_text(kinds, message, here());
+    }
 }
 
-/// `trigger!`'s target, and the function's.
+/// `trigger!`'s target.
 #[doc(hidden)]
+#[inline]
 pub fn trigger_args(kinds: Kinds, args: fmt::Arguments<'_>, location: Location) {
     let word = state::load();
     if state::is_ready(word) {
@@ -343,7 +395,17 @@ pub fn trigger_args(kinds: Kinds, args: fmt::Arguments<'_>, location: Location) 
 #[track_caller]
 #[inline]
 pub fn trigger(kinds: Kinds, message: &str) {
-    trigger_args(kinds, format_args!("{message}"), here());
+    let word = state::load();
+    if state::is_ready(word) {
+        text_ready(
+            word,
+            Verb::Trigger,
+            Severity::WARNING,
+            Kinds::TRIGGER | kinds,
+            message,
+            here(),
+        );
+    }
 }
 
 /// A run-time deprecation warning for anything that is not a Rust item (a
@@ -358,13 +420,9 @@ pub fn trigger(kinds: Kinds, message: &str) {
 #[track_caller]
 #[inline]
 pub fn deprecated(item: &str) {
-    warning(
-        Verb::Deprecated,
-        Kinds::DEPRECATED | Kinds::WARNING,
-        format_args!("`{item}` is deprecated"),
-        here(),
-        Memory::Table,
-    );
+    if state::is_ready(state::load()) {
+        deprecated_text(item, here());
+    }
 }
 
 /// A soft error: a warning today that a strict deployment refuses.
@@ -390,26 +448,28 @@ pub fn deprecated(item: &str) {
 /// assert!(define_err::soft(Unsigned).is_ok());
 /// ```
 #[track_caller]
+#[inline]
 pub fn soft<E: Error + 'static>(error: E) -> Result<(), E> {
     let word = state::load();
     match state::mode(word) {
         WarnMode::Error => Err(error),
+        WarnMode::Ignore => Ok(()),
         _ => {
-            soft_ready(word, &error, here());
+            if state::is_ready(word) && !state::below_minimum(word, Severity::WARNING) {
+                soft_ready(word, &error, here());
+            }
             Ok(())
         }
     }
 }
 
 fn soft_ready(word: Word, error: &(dyn Error + 'static), location: Location) {
-    if state::is_ready(word) && state::mode(word) != WarnMode::Ignore {
-        let event = error_event(Verb::Soft, error, location);
-        let kinds = Kinds::WARNING | event.kinds;
-        if state::passes(word, Severity::WARNING, kinds) {
-            deliver(
-                word,
-                &event.with_kinds(kinds).with_severity(Severity::WARNING),
-            );
-        }
+    let event = error_event(Verb::Soft, error, location);
+    let kinds = Kinds::WARNING | event.kinds;
+    if state::passes(word, Severity::WARNING, kinds) {
+        deliver(
+            word,
+            &event.with_kinds(kinds).with_severity(Severity::WARNING),
+        );
     }
 }

@@ -122,6 +122,88 @@ macro_rules! __define_err_emit {
             }
         }
 
+        $crate::__define_err_emit! { @info [$ns $docs $rf] ($vis) $name [ $(
+            ( [$($vcfg)*] [$($path)*] [$($tname)*] [$($title)*]
+              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
+              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
+              $(( $( { $xrole $xname : $xty } )* ))?
+              => $msg )
+        )* ] }
+
+        $(
+            $($vcfg)*
+            $crate::__define_err_from! {
+                $name [$($path)*]
+                $( braced $( $frole $fname : $fty ; )* )?
+                $( tuple $( $xrole $xname : $xty ; )* )?
+            }
+        )*
+    };
+
+    // No namespace, no metadata, nothing transparent: every method the trait
+    // defaults gives the answer a match would, and every probe differs only in
+    // its name, so it is a literal with nothing to evaluate. An enum that only
+    // replaces thiserror lands here. `tests/define_meta.rs` holds the two arms
+    // to the same answers.
+    (@info [[] $docs:tt $rf:tt] ($vis:vis) $name:ident [ $(
+        ( [$($vcfg:tt)*] [$($path:tt)*] [$($tname:tt)*] [$($title:tt)*]
+          [] [] [] [] [] [] [] []
+          $({ $( { [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
+          $(( $( { $xrole:ident $xname:ident : $xty:ty } )* ))?
+          => $msg:literal )
+    )* ]) => {
+        #[allow(deprecated)]
+        impl ::core::error::Error for $name {
+            fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
+                #[allow(unused_variables)]
+                match *self { $(
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                        $crate::__define_err_source!($msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
+                )* }
+            }
+
+            fn description(&self) -> &str {
+                match *self { $(
+                    $($vcfg)* $($path)* { .. } => ::core::concat!("\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|", $($tname)*),
+                )* }
+            }
+        }
+
+        const _: () = $crate::__private::check_names(&[ $( $($vcfg)* $($tname)*, )* ]);
+
+        #[allow(deprecated)]
+        impl $crate::ErrorInfo for $name {
+            fn retry_after(&self) -> ::core::option::Option<::core::time::Duration> {
+                #[allow(unused_variables)]
+                match *self { $(
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                        $crate::__define_err_value!(@retry_after [] []; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
+                )* }
+            }
+
+            fn location(&self) -> ::core::option::Option<$crate::Location> {
+                #[allow(unused_variables)]
+                match *self { $(
+                    $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
+                        $crate::__define_err_location!($msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
+                )* }
+            }
+
+            fn type_name(&self) -> &'static str {
+                match *self { $(
+                    $($vcfg)* $($path)* { .. } => $($tname)*,
+                )* }
+            }
+        }
+    };
+
+    (@info [$ns:tt $docs:tt $rf:tt] ($vis:vis) $name:ident [ $(
+        ( [$($vcfg:tt)*] [$($path:tt)*] [$($tname:tt)*] [$($title:tt)*]
+          [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]
+          $({ $( { [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
+          $(( $( { $xrole:ident $xname:ident : $xty:ty } )* ))?
+          => $msg:tt )
+    )* ]) => {
         #[allow(deprecated)]
         impl ::core::error::Error for $name {
             fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
@@ -256,15 +338,6 @@ macro_rules! __define_err_emit {
                 )* }
             }
         }
-
-        $(
-            $($vcfg)*
-            $crate::__define_err_from! {
-                $name [$($path)*]
-                $( braced $( $frole $fname : $fty ; )* )?
-                $( tuple $( $xrole $xname : $xty ; )* )?
-            }
-        )*
 
         #[allow(deprecated)]
         impl $name {

@@ -13,6 +13,49 @@
 
 ---
 
+## [0.6.0] - 2026-11-03
+
+Optimisation. Every target in `dev/PLAN.md` 11.1 is met or has a reviewed
+reason in the decision log (D-060). No public API changes.
+
+### Added
+
+- `docs/PERFORMANCE.md`: every target, what was measured, how, and where.
+- Benchmarks against `log` and error-forge: `benches/codes.rs`,
+  `benches/facade.rs`, `benches/record.rs`, and `benches/floor.rs`, which
+  stays stable on a busy machine. `benches/baseline.txt` and
+  `tools/bench-compare.py` fail a regression over 5%.
+- `tools/build-time/compare.py` times clean and incremental builds against
+  thiserror and refuses a build that compiled nothing. `tools/asm/` is the
+  crate whose assembly `docs/PERFORMANCE.md` reads.
+
+### Changed
+
+- A plain enum (no namespace, no metadata, nothing transparent) expands to
+  what `docs/GENERATED-CODE.md` always described, with literal probes: a clean
+  build of 20 enums is 77% faster than with thiserror.
+- The identity probe decodes eight digits at a time, in the same format and
+  with the same validation: `identify` 51 ns to 29 ns, foreign errors 8 ns to
+  2 ns.
+- `report` below the minimum severity reads two digits of the probe: 99 ns to
+  6 ns. `report` delivered: 96 ns to 49 ns.
+- `warn()` after a site has fired: 41 ns to 16 ns, with a new site hash.
+- `Code`'s `Display`: 73 ns to 39 ns.
+- The empty path of `notice`, `warn`, `trigger`, and `deprecated` is one load
+  and a branch, with nothing set up first; `warn()` 3.7 ns to 0.5 ns.
+
+### Fixed
+
+- A non-ASCII type or variant name is a compile error, as documented. It
+  compiled, and `identify` then returned `None` for it.
+
+### Internal
+
+- `__private::check_names` is new, for the plain arm. `probe_len` rejects a
+  non-ASCII name. Both are in `docs/GENERATED-CODE.md`.
+
+---
+
 ## [0.5.0] - 2026-11-02
 
 The reporting facade and the owned record. Feature complete.
@@ -267,7 +310,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jamesgober/define-err/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/define-err/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/define-err/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamesgober/define-err/compare/v0.2.0...v0.3.0

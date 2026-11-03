@@ -85,15 +85,30 @@ impl<const N: usize> SiteTable<N> {
     }
 }
 
-/// The key of a source location: FNV-1a over the file name, line, and column.
+/// One round of the key hash: a 64 by 64 multiply folded back to 64 bits.
+#[inline]
+fn mix(hash: u64, word: u64) -> u64 {
+    let wide = u128::from(hash ^ word) * 0x9e37_79b9_7f4a_7c15_u128;
+    wide as u64 ^ (wide >> 64) as u64
+}
+
+/// The key of a source location: the file name, line, and column, hashed
+/// eight bytes at a time so a long path costs a few rounds, not one per byte.
 /// By content, because the compiler may emit one location twice across
 /// codegen units. Never 0.
 pub(crate) fn key(file: &str, line: u32, column: u32) -> Key {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    let tail = line.to_le_bytes().into_iter().chain(column.to_le_bytes());
-    for byte in file.bytes().chain(tail) {
-        hash = (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3);
+    let mut hash = 0xcbf2_9ce4_8422_2325 ^ file.len() as u64;
+    let mut bytes = file.as_bytes();
+    while let Some((chunk, rest)) = bytes.split_first_chunk::<8>() {
+        hash = mix(hash, u64::from_le_bytes(*chunk));
+        bytes = rest;
     }
+    let mut tail = [0_u8; 8];
+    for (slot, byte) in tail.iter_mut().zip(bytes) {
+        *slot = *byte;
+    }
+    hash = mix(hash, u64::from_le_bytes(tail));
+    hash = mix(hash, u64::from(line) << 32 | u64::from(column));
     // Folds to 32 bits where `Key` is 32 bits; the high half mixes in.
     let folded = (hash ^ (hash >> 32)) as Key;
     if folded == 0 {
@@ -156,5 +171,27 @@ mod tests {
         assert_ne!(base, key("src/b.rs", 1, 2));
         assert_ne!(base, key("src/a.rs", 2, 2));
         assert_ne!(base, key("src/a.rs", 1, 3));
+        assert_ne!(key("src/a.rs", 1, 2), key("src/a.rs\0", 1, 2));
+        assert_ne!(
+            key("src/lib/one/mod.rs", 1, 2),
+            key("src/lib/two/mod.rs", 1, 2)
+        );
+    }
+
+    /// A collision silences a warning, so no two of a large set of sites may
+    /// share a key.
+    #[test]
+    fn test_key_has_no_collision_in_a_large_set() {
+        extern crate std;
+        let (files, lines) = if cfg!(miri) { (2, 16) } else { (64, 512) };
+        let mut keys = std::collections::HashSet::new();
+        for file in 0..files {
+            let name = std::format!("crates/app/src/module_{file}/mod.rs");
+            for line in 1..=lines {
+                for column in [1, 5, 9, 13, 17, 21, 25, 29] {
+                    assert!(keys.insert(key(&name, line, column)));
+                }
+            }
+        }
     }
 }

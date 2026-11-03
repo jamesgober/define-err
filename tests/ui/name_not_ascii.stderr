@@ -1,0 +1,24 @@
+error[E0080]: evaluation panicked: define_errors!: a type or variant name must be ASCII
+ --> tests/ui/name_not_ascii.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum T {
+5 | |         Größe => "too large",
+6 | |     }
+7 | | }
+  | |_^ evaluation of `_` failed inside this call
+  |
+note: inside `define_err::__private::check_names`
+ --> src/private.rs
+  |
+  |         let _ = probe_len(names[i], None);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+note: inside `define_err::__private::probe_len`
+ --> $RUST/core/src/panic.rs
+  |
+  = note: the failure occurred here
+  |
+ ::: src/private.rs
+  |
+  |         panic!("define_errors!: a type or variant name must be ASCII");
+  |         -------------------------------------------------------------- in this macro invocation

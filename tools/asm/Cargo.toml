@@ -1,0 +1,16 @@
+# The code an application gets from the facade and the generated types, for
+# reading the assembly (docs/PERFORMANCE.md). Not part of the published crate.
+[package]
+name    = "define-err-asm"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+define-err = { path = "../.." }
+thiserror  = "2"
+
+[workspace]

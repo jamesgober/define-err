@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.5.0"
+version = "0.6.0"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and
@@ -76,8 +76,11 @@ testing = ["std"]
 thiserror = "2"
 # Compile-fail tests of the macro's error messages (tests/ui, stable only).
 trybuild = "1"
-# Benchmarks against thiserror and hand-written impls (benches/).
+# Benchmarks against thiserror, log, error-forge, and hand-written impls
+# (benches/; results in docs/PERFORMANCE.md).
 criterion = { version = "0.5", default-features = false }
+log = "0.4"
+error-forge = "1"
 # Property tests of every invariant (round trips, set laws, "never panics").
 proptest = { version = "1", default-features = false, features = ["std"] }
 
@@ -107,6 +110,25 @@ required-features = ["alloc"]
 name    = "definitions"
 harness = false
 
+[[bench]]
+name    = "codes"
+harness = false
+
+[[bench]]
+name              = "facade"
+harness           = false
+required-features = ["alloc"]
+
+[[bench]]
+name              = "record"
+harness           = false
+required-features = ["alloc"]
+
+[[bench]]
+name              = "floor"
+harness           = false
+required-features = ["alloc"]
+
 
 # RELEASE PROFILE
 # #################################
@@ -116,3 +138,10 @@ lto           = "fat"
 codegen-units = 1
 panic         = "abort"
 strip         = "symbols"
+
+# Benchmarks measure what an application gets: dependencies' profiles do not
+# apply to it, and fat LTO folds constant call sites away.
+[profile.bench]
+lto           = false
+codegen-units = 16
+strip         = false

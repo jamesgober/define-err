@@ -85,9 +85,9 @@ pub struct Identity<'a> {
 ///
 /// A foreign error is rejected after one comparison of four bytes. Every
 /// field is validated (code layout, severity range, category range, ASCII
-/// name); a malformed probe is `None`. No allocation [est. about 10 ns for a
-/// generated type, about 2 ns for a foreign one]. Codes identify an error;
-/// they do not authenticate it.
+/// name); a malformed probe is `None`. No allocation; about 26 ns for a
+/// generated type and 2 ns for a foreign one (`docs/PERFORMANCE.md`). Codes
+/// identify an error; they do not authenticate it.
 ///
 /// # Examples
 ///
@@ -98,6 +98,7 @@ pub struct Identity<'a> {
 /// assert!(identify(&foreign).is_none());
 /// ```
 #[must_use]
+#[inline]
 pub fn identify<'a>(error: &'a (dyn Error + 'static)) -> Option<Identity<'a>> {
     #[allow(deprecated)]
     let text = error.description();
@@ -197,52 +198,116 @@ pub fn innermost_code<'a>(error: &'a (dyn Error + 'static)) -> Option<(Code, Ide
     found
 }
 
-/// The value of one lowercase hex digit.
-const fn hex_digit(byte: u8) -> Option<u64> {
-    match byte {
-        b'0'..=b'9' => Some((byte - b'0') as u64),
-        b'a'..=b'f' => Some((byte - b'a') as u64 + 10),
-        _ => None,
+/// Each byte's value as a lowercase hex digit, or a value with high bits set.
+const HEX: [u8; 256] = {
+    let mut table = [0xFF; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        table[byte] = match byte as u8 {
+            digit @ b'0'..=b'9' => digit - b'0',
+            digit @ b'a'..=b'f' => digit - b'a' + 10,
+            _ => 0xFF,
+        };
+        byte += 1;
+    }
+    table
+};
+
+/// Lowercase hex, exactly `bytes.len()` digits, most significant first. No
+/// branch per digit: a bad digit shows in `seen` at the end.
+#[inline]
+fn hex(bytes: &[u8]) -> Option<u64> {
+    let (mut value, mut seen) = (0_u64, 0_u8);
+    for &byte in bytes {
+        let digit = HEX[usize::from(byte)];
+        seen |= digit;
+        value = value << 4 | u64::from(digit);
+    }
+    (seen < 16).then_some(value)
+}
+
+/// Eight lowercase hex digits at once, most significant first; `None` unless
+/// every byte is one. Each addition below puts a byte's position against one
+/// bound into its high bit. A byte at or above 0x80 could carry into its
+/// neighbour, but such a byte fails the check by itself.
+#[inline]
+fn hex8(chunk: &[u8; 8]) -> Option<u64> {
+    const ONES: u64 = 0x0101_0101_0101_0101;
+    const HIGH: u64 = ONES * 0x80;
+    let word = u64::from_be_bytes(*chunk);
+    let from_0 = word.wrapping_add(ONES * (0x80 - 0x30));
+    let past_9 = word.wrapping_add(ONES * (0x80 - 0x3a));
+    let from_a = word.wrapping_add(ONES * (0x80 - 0x61));
+    let past_f = word.wrapping_add(ONES * (0x80 - 0x67));
+    if ((from_0 & !past_9) | (from_a & !past_f)) & !word & HIGH != HIGH {
+        return None;
+    }
+    let nibbles = (word & (ONES * 0x0f)) + ((word >> 6) & ONES) * 9;
+    let bytes = (nibbles | nibbles >> 4) & 0x00ff_00ff_00ff_00ff;
+    let halves = (bytes | bytes >> 8) & 0x0000_ffff_0000_ffff;
+    Some((halves | halves >> 16) & 0xffff_ffff)
+}
+
+/// Sixteen lowercase hex digits.
+#[inline]
+fn hex16(bytes: &[u8]) -> Option<u64> {
+    let (high, low) = bytes.split_first_chunk::<8>()?;
+    Some(hex8(high)? << 32 | hex8(low.first_chunk::<8>()?)?)
+}
+
+/// The severity a probe states, from its two digits alone: what dropping an
+/// event below the minimum needs. `None` for anything without the magic, and
+/// for a severity that does not parse, so those take the full decode.
+#[inline]
+pub(crate) fn stated_severity(error: &(dyn Error + 'static)) -> Option<u8> {
+    #[allow(deprecated)]
+    let bytes = error.description().as_bytes();
+    if bytes.first_chunk::<4>() != Some(MAGIC) {
+        return None;
+    }
+    u8::try_from(hex(bytes.get(20..22)?)?).ok()
+}
+
+/// Decodes a probe string; `None` unless every field is valid. A foreign
+/// error stops at the magic.
+#[inline]
+pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
+    if text.as_bytes().first_chunk::<4>() == Some(MAGIC) {
+        decode_fields(text)
+    } else {
+        None
     }
 }
 
-/// Lowercase hex, exactly `bytes.len()` digits, most significant first.
-fn hex(bytes: &[u8]) -> Option<u64> {
-    bytes
-        .iter()
-        .try_fold(0_u64, |value, &byte| Some(value << 4 | hex_digit(byte)?))
-}
-
-/// Decodes a probe string; `None` unless every field is valid.
-pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
+fn decode_fields(text: &str) -> Option<Identity<'_>> {
     let bytes = text.as_bytes();
-    if bytes.len() <= HEADER
-        || bytes.len() > HEADER + MAX_NAME + 1 + MAX_PUBLIC
-        || &bytes[..4] != MAGIC
-    {
+    if bytes.len() <= HEADER || bytes.len() > HEADER + MAX_NAME + 1 + MAX_PUBLIC {
         return None;
     }
     let code = match &bytes[4..20] {
         b"xxxxxxxxxxxxxxxx" => None,
-        digits => Some(Code::from_u64(hex(digits)?)?),
+        digits => Some(Code::from_u64(hex16(digits)?)?),
     };
     let severity = Severity::new(u8::try_from(hex(&bytes[20..22])?).ok()?)?;
     let category = Category::from_grpc(u8::try_from(hex(&bytes[22..24])?).ok()?)?;
-    let kinds = Kinds::from_bits(hex(&bytes[24..40])?);
+    let kinds = Kinds::from_bits(hex16(&bytes[24..40])?);
     let flags = hex(&bytes[40..42])?;
     if flags > 0b11 || bytes[42] != b'|' {
         return None;
     }
-    // Byte 42 is ASCII, so `HEADER` is a character boundary.
+    // Byte 42 is ASCII, so `HEADER` is a character boundary, as is a `|`.
+    let rest = text.get(HEADER..)?;
     let (type_name, public) = if flags & 1 != 0 {
-        let (name, public) = text[HEADER..].split_once('|')?;
-        (name, Some(public))
+        let name_len = rest.bytes().position(|byte| byte == b'|')?;
+        (rest.get(..name_len)?, Some(rest.get(name_len + 1..)?))
     } else {
-        (&text[HEADER..], None)
+        (rest, None)
     };
     if type_name.is_empty()
         || type_name.len() > MAX_NAME
-        || !type_name.bytes().all(|byte| byte.is_ascii_graphic())
+        || !type_name
+            .bytes()
+            .fold(true, |graphic, byte| graphic & byte.is_ascii_graphic())
         || public.is_some_and(|text| text.len() > MAX_PUBLIC)
     {
         return None;
@@ -261,8 +326,41 @@ pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
 
 #[cfg(test)]
 mod tests {
-    use super::decode;
+    use super::{decode, hex, hex16, hex8};
     use crate::{Category, Kinds, Severity};
+
+    /// Every byte value in every position, against the digit-at-a-time form.
+    #[test]
+    fn test_hex8_agrees_with_hex() {
+        for position in 0..8 {
+            for byte in 0..=255 {
+                let mut chunk = *b"09afc3e1";
+                chunk[position] = byte;
+                assert_eq!(hex8(&chunk), hex(&chunk), "{chunk:?}");
+            }
+        }
+        assert_eq!(hex8(b"0123abcd"), Some(0x0123_abcd));
+        assert_eq!(hex8(b"ffffffff"), Some(0xffff_ffff));
+    }
+
+    /// Neighbouring bad bytes cannot hide each other through a carry.
+    #[test]
+    fn test_hex8_rejects_pairs_of_bad_bytes() {
+        for first in (0..=255).step_by(3) {
+            for second in 0..=255 {
+                let mut chunk = *b"00000000";
+                chunk[3] = first;
+                chunk[4] = second;
+                assert_eq!(hex8(&chunk), hex(&chunk), "{chunk:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_hex16_reads_the_high_half_first() {
+        assert_eq!(hex16(b"0123456789abcdef"), Some(0x0123_4567_89ab_cdef));
+        assert_eq!(hex16(b"0123456789abcde"), None);
+    }
 
     #[test]
     fn test_decode_golden_probes() {
