@@ -1427,7 +1427,7 @@ The contract, also in `docs/FACADE.md` (from `0.5`):
 - It may be called from any thread at once.
 - It must not assume one call per error: a report and a later warning about the same error are two events.
 - It must keep nothing borrowed from the event after it returns; it copies what it needs or builds an [`ErrorRecord`](#errorrecord).
-- With `std`, a verb called from inside `receive` on the same thread is dropped and counted, and a panic inside `receive` is caught and counted. Without `std` neither guard exists, and the reporter must not call verbs or panic.
+- With `std`, a verb called from inside `receive` on the same thread is dropped and counted, and a panic inside `receive`, or in the `description()` of an error being reported, is caught and counted. Without `std` neither guard exists, and the reporter must not call verbs or panic.
 
 ```rust
 use define_err::{Event, Reporter};

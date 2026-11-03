@@ -378,7 +378,8 @@ pub struct FacadeStats {
     pub site_table_overflow: u64,
     /// Events dropped because a reporter called a verb inside `receive`.
     pub reentrant_dropped: u64,
-    /// Panics caught inside `receive`, a panicking payload drop included.
+    /// Panics caught inside `receive` or an error's own `description()`, a
+    /// panicking payload drop included.
     pub reporter_panics: u64,
 }
 

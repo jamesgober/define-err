@@ -37,7 +37,7 @@ Warnings raised before installation are not lost: they do not use up their call 
 | It must not assume one call per error. | A report and a later warning about the same error are two events. |
 | It keeps nothing borrowed from the event. | `Event` lives on the caller's stack for the length of the call. Copy what you need, or build an [`ErrorRecord`](./API.md#errorrecord), which is owned, bounded, and `Send + Sync`. |
 | With `std`: calling a verb from inside `receive` is safe. | The nested event is dropped and counted in `stats().reentrant_dropped`. |
-| With `std`: a panic inside `receive` is safe. | It is caught and counted in `stats().reporter_panics`. A payload that panics when dropped is caught and counted too. |
+| With `std`: a panic inside `receive` is safe. | It is caught and counted in `stats().reporter_panics`. A payload that panics when dropped is caught and counted too. So is a panic in a reported error's own `description()`, which a verb calls to read the probe. |
 | Without `std`: `receive` must not call a verb and must not panic. | Neither guard exists: there is no thread-local and no `catch_unwind`. |
 | Under `panic = "abort"`: a panic in `receive` aborts. | Nothing can catch it. |
 

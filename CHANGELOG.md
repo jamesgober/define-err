@@ -11,6 +11,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- `docs/SECURITY.md`: threats T1 to T17 with each defence, its cost, and its test, and what is not defended, forged probes above all.
+- `docs/ARCHITECTURE.md` and `docs/PLATFORM-NOTES.md`.
+- Attack tests for every threat (`tests/attack*.rs`), a stress and soak of every verb from 64 threads (`tests/stress.rs`), and the fuzz target `kinds_display`.
+
+### Fixed
+
+- A panic in a reported error's own `description()` is contained like a panic in `receive`, and counted in `stats().reporter_panics`. It used to unwind into the caller of `report`, `report_with`, or `soft`.
+
 ---
 
 ## [0.6.0] - 2026-11-03

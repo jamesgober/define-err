@@ -16,12 +16,18 @@ use super::{
 use crate::ErrorRecord;
 use crate::{here, probe, Kinds, Location, Severity};
 
-/// Hands an event to the reporter.
+/// Hands an event to the reporter, from inside a guard.
+#[inline]
+fn hand_over(word: Word, event: &Event<'_>) {
+    if let Some(reporter) = state::reporter(word) {
+        reporter.receive(event);
+    }
+}
+
+/// Hands an event to the reporter under the guard.
 #[inline]
 fn deliver(word: Word, event: &Event<'_>) {
-    if let Some(reporter) = state::reporter(word) {
-        guard::run(|| reporter.receive(event));
-    }
+    guard::run(|| hand_over(word, event));
 }
 
 /// An event for an error, from its probe.
@@ -37,21 +43,40 @@ fn error_event<'a>(verb: Verb, error: &'a (dyn Error + 'static), location: Locat
     event
 }
 
-/// Delivers a report after the `is_ready` check. A minimum severity is
-/// checked from the probe's two digits first, so dropping an event does not
-/// decode the rest.
+/// Delivers a report after the `is_ready` check. Reading the probe calls the
+/// error's own `description()`, so it runs under the guard with the reporter.
+/// A minimum severity is checked from the probe's two digits first, so
+/// dropping an event does not decode the rest.
 fn report_ready(word: Word, error: &(dyn Error + 'static), location: Location) {
-    if state::has_minimum(word)
-        && probe::stated_severity(error)
-            .and_then(Severity::new)
-            .is_some_and(|severity| state::below_minimum(word, severity))
-    {
-        return;
-    }
-    let event = error_event(Verb::Report, error, location);
-    if state::passes(word, event.severity, event.kinds) {
-        deliver(word, &event);
-    }
+    guard::run(|| {
+        if state::has_minimum(word)
+            && probe::stated_severity(error)
+                .and_then(Severity::new)
+                .is_some_and(|severity| state::below_minimum(word, severity))
+        {
+            return;
+        }
+        let event = error_event(Verb::Report, error, location);
+        if state::passes(word, event.severity, event.kinds) {
+            hand_over(word, &event);
+        }
+    });
+}
+
+/// `report_with`'s slow path, under the guard for the reason above.
+fn report_with_ready(
+    word: Word,
+    error: &(dyn Error + 'static),
+    severity: Severity,
+    kinds: Kinds,
+    location: Location,
+) {
+    guard::run(|| {
+        let event = error_event(Verb::Report, error, location)
+            .with_severity(severity)
+            .with_kinds(kinds);
+        hand_over(word, &event);
+    });
 }
 
 /// Reports an error. Severity, kinds, code, and category come from its
@@ -101,10 +126,7 @@ pub fn report(error: &(dyn Error + 'static)) {
 pub fn report_with(error: &(dyn Error + 'static), severity: Severity, kinds: Kinds) {
     let word = state::load();
     if state::is_ready(word) && state::passes(word, severity, kinds) {
-        let event = error_event(Verb::Report, error, here())
-            .with_severity(severity)
-            .with_kinds(kinds);
-        deliver(word, &event);
+        report_with_ready(word, error, severity, kinds, here());
     }
 }
 
@@ -464,12 +486,14 @@ pub fn soft<E: Error + 'static>(error: E) -> Result<(), E> {
 }
 
 fn soft_ready(word: Word, error: &(dyn Error + 'static), location: Location) {
-    let event = error_event(Verb::Soft, error, location);
-    let kinds = Kinds::WARNING | event.kinds;
-    if state::passes(word, Severity::WARNING, kinds) {
-        deliver(
-            word,
-            &event.with_kinds(kinds).with_severity(Severity::WARNING),
-        );
-    }
+    guard::run(|| {
+        let event = error_event(Verb::Soft, error, location);
+        let kinds = Kinds::WARNING | event.kinds;
+        if state::passes(word, Severity::WARNING, kinds) {
+            hand_over(
+                word,
+                &event.with_kinds(kinds).with_severity(Severity::WARNING),
+            );
+        }
+    });
 }
