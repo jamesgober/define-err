@@ -692,9 +692,13 @@ pub type Location = &'static core::panic::Location<'static>;
 
 #[track_caller]
 pub fn here() -> Location;
+
+pub fn short_file(file: &str) -> &str;                               // since 0.8
 ```
 
 `Location` is the type of `#[location]` fields: a file, line, and column, 8 bytes on 64-bit targets. `here()` returns the location of its caller, for building a located variant by hand. A `#[track_caller]` function that calls `here()` gets its own caller's location.
+
+`short_file` is a location's file as a log should show it (threat T17). A dependency built from a registry has an absolute path that names the home directory it was unpacked into; `short_file` cuts it to the crate's directory and what follows (`page-db-1.0.0/src/error.rs`), and an absolute path with no `src` directory to its file name. A relative path, which is what the crates of a workspace get, comes back unchanged. One scan, no allocation.
 
 ```rust
 let at = define_err::here();
@@ -1963,6 +1967,7 @@ pub struct TrailEntry {
 }
 impl TrailEntry {
     pub fn new(location: Location, step: TrailStep) -> TrailEntry;   // borrows the file name, no allocation
+    pub fn short_file(&self) -> &str;                                // since 0.8: short_file(&self.file)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

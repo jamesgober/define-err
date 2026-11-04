@@ -11,6 +11,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- `short_file` and `TrailEntry::short_file`: a location's file as a log
+  should show it. A registry path, which names the home directory, is cut to
+  the crate's directory (`page-db-1.0.0/src/error.rs`); a relative path is
+  unchanged (threat T17).
+
+### Fixed
+
+- A `PathBuf`, `Path`, or `&Path` field named in a plain message shows
+  through `display()`, as with thiserror. It used to be a compile error
+  (`PathBuf` does not implement `Display`), so a thiserror message such as
+  `"file not found: {0}"` on a `PathBuf` could not be kept as written. Every
+  other field formats exactly as before.
+- A `#[code]` without `help`, or with its fields out of order, reports that
+  one error. Two of them in a block also reported a false duplicate code.
+
+### Generated code
+
+- A plain message's `Display` arm rebinds each field through
+  `__private::shown_of!` first. New `__private` items: `shown_of!`,
+  `ShownViaPath`, `ShownViaAny`, `check_number`, `INVALID_NUMBER`.
+  `check_block` skips `INVALID_NUMBER`. `docs/GENERATED-CODE.md` has the
+  details.
+
 ---
 
 ## [0.7.0] - 2026-11-04

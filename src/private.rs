@@ -198,6 +198,66 @@ impl<'a, T: ?Sized> InfoViaNothing<'a> for Wrap<'a, T> {
     }
 }
 
+/// What a message shows for a `Path` or `PathBuf` field: its `display()`, as
+/// thiserror does. Without `std` there is no `Path`, and no impl.
+#[doc(hidden)]
+pub trait ShownViaPath<'a> {
+    type Shown;
+    fn __define_err_shown(&self) -> Self::Shown;
+}
+
+#[cfg(feature = "std")]
+impl<'a> ShownViaPath<'a> for &Wrap<'a, std::path::Path> {
+    type Shown = std::path::Display<'a>;
+    #[inline]
+    fn __define_err_shown(&self) -> std::path::Display<'a> {
+        self.0.display()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a, 'b: 'a> ShownViaPath<'a> for &Wrap<'a, &'b std::path::Path> {
+    type Shown = std::path::Display<'a>;
+    #[inline]
+    fn __define_err_shown(&self) -> std::path::Display<'a> {
+        self.0.display()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a> ShownViaPath<'a> for &Wrap<'a, std::path::PathBuf> {
+    type Shown = std::path::Display<'a>;
+    #[inline]
+    fn __define_err_shown(&self) -> std::path::Display<'a> {
+        self.0.display()
+    }
+}
+
+/// Every other field is shown as itself: the same reference the pattern
+/// bound, so every format spec means what it meant.
+#[doc(hidden)]
+pub trait ShownViaAny<'a, T: ?Sized> {
+    fn __define_err_shown(&self) -> &'a T;
+}
+
+impl<'a, T: ?Sized> ShownViaAny<'a, T> for Wrap<'a, T> {
+    #[inline]
+    fn __define_err_shown(&self) -> &'a T {
+        self.0
+    }
+}
+
+/// A field as a message shows it: `$crate::__private::shown_of!(field)`.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __define_err_shown_of {
+    ($field:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::__private::{ShownViaAny as _, ShownViaPath as _};
+        (&&$crate::__private::Wrap($field)).__define_err_shown()
+    }};
+}
+
 /// `source()` of a field: `$crate::__private::source_of!(field)`.
 #[doc(hidden)]
 #[macro_export]
@@ -305,6 +365,21 @@ pub const fn severity<const N: u8>() -> crate::Severity {
     crate::Severity::at::<N>()
 }
 
+/// The number a `#[code]` without a number literal stands in with. Its own
+/// `compile_error!` already reports it, so the block's checks skip it. No
+/// valid code reaches it (numbers are 24 bits).
+#[doc(hidden)]
+pub const INVALID_NUMBER: u32 = u32::MAX;
+
+/// The range check of one code number, skipping the stand-in above. Const
+/// evaluation only.
+#[doc(hidden)]
+pub const fn check_number(namespace: crate::Namespace, number: u32) {
+    if number != INVALID_NUMBER {
+        let _ = code(namespace, number);
+    }
+}
+
 /// The block's checks: no number twice (retired numbers included), and every
 /// replacement names another code of the block. Const evaluation only.
 #[doc(hidden)]
@@ -317,6 +392,10 @@ pub const fn check_block(
 ) {
     let mut i = 0;
     while i < numbers.len() {
+        if numbers[i] == INVALID_NUMBER {
+            i += 1;
+            continue;
+        }
         let mut j = i + 1;
         while j < numbers.len() {
             if numbers[i] == numbers[j] {
@@ -691,7 +770,7 @@ macro_rules! __define_err_retry_after_of {
 pub use crate::{
     __define_err_description_of as description_of, __define_err_forward_source as forward_source,
     __define_err_info_of as info_of, __define_err_retry_after_of as retry_after_of,
-    __define_err_source_of as source_of,
+    __define_err_shown_of as shown_of, __define_err_source_of as source_of,
 };
 
 #[cfg(test)]

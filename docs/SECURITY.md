@@ -28,7 +28,7 @@ Costs are measured in [`PERFORMANCE.md`](./PERFORMANCE.md) unless marked as an e
 | T14 | Formatting forced on a hot path by an event nobody wants | Events carry `fmt::Arguments` and borrowed errors. Nothing formats until a reporter does. | none |
 | T15 | Private text promoted to public through a record | `ErrorRecord.public` comes only from a public message or the category's sentence. `Display` output goes only into `chain[..].message`. | none |
 | T16 | A project uses platform kind bits for its own meaning | `Kinds::project::<N>()` reaches bits 32 to 63 only, checked at compile time. Platform constants never change. | none |
-| T17 | Locations reveal build paths | `Location` is never part of a public message. `ErrorRecord.trail` is private data. | none |
+| T17 | Locations reveal build paths | `Location` is never part of a public message. `ErrorRecord.trail` is private data. A sink that logs a location writes `short_file(location.file())` or `TrailEntry::short_file()`, which cut a registry path to the crate's directory. | one scan of the path, only when a sink writes it |
 
 ## The tests
 
@@ -52,7 +52,7 @@ Every threat has an attack test. Each one drives the attack, not the feature.
 | T14 | `tests/facade.rs`: `test_min_severity_filters_before_formatting`. `tests/facade_empty.rs` |
 | T15 | `tests/attack.rs`: `test_record_public_never_takes_inner_display_text`, `test_record_of_a_foreign_chain_uses_the_category_sentence` |
 | T16 | `tests/ui/project_kind_out_of_range.rs`. `src/kinds.rs`: `test_kinds_project_bits` |
-| T17 | `tests/attack_facade.rs`: `test_location_stays_out_of_public_text` |
+| T17 | `tests/attack_facade.rs`: `test_location_stays_out_of_public_text`. `src/location.rs`: `test_short_file_cuts_absolute_paths_to_the_crate`, `test_short_file_keeps_relative_paths` |
 
 ## Forged probes
 

@@ -223,7 +223,7 @@ pub use crate::{
     },
     info::{catalog, CodeInfo, CodeState, ErrorInfo, UrlDisplay},
     kinds::{Kinds, KindsIter},
-    location::{here, Location},
+    location::{here, short_file, Location},
     probe::{identify, innermost_code, Identity},
     secret::Secret,
     severity::{Band, LevelNames, Severity},

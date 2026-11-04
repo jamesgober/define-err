@@ -9,6 +9,11 @@ error[E0080]: evaluation panicked: define_errors!: a code number must be from 0 
 9 | | }
   | |_^ evaluation of `_` failed inside this call
   |
+note: inside `define_err::__private::check_number`
+ --> src/private.rs
+  |
+  |         let _ = code(namespace, number);
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^
 note: inside `define_err::__private::code`
  --> $RUST/core/src/panic.rs
   |

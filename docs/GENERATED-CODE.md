@@ -69,7 +69,7 @@ For a type `T` with variants `V1..Vn` (a struct is one variant):
 | # | Item | Content |
 |---|---|---|
 | G1 | the type | user attributes passed through; `#[derive(::core::fmt::Debug)]` unless `#[manual_debug]`; `#[non_exhaustive]` on enums unless `#[exhaustive]` or the user already wrote `#[non_exhaustive]` (never a second copy; structs: never added, because it would forbid construction outside the crate); field markers removed; `#[location]` fields keep their declared type, which must be `$crate::Location` |
-| G2 | `impl ::core::fmt::Display for T` | one `match self` with one arm per variant binding every field by its name (tuple fields by their binding name, or `_` when unnamed); the arm calls `::core::write!(f, <format string> [, <arguments>])`; `transparent` arms call `::core::fmt::Display::fmt(inner, f)`; `#[allow(unused_variables)]` on the match |
+| G2 | `impl ::core::fmt::Display for T` | one `match self` with one arm per variant binding every field by its name (tuple fields by their binding name, or `_` when unnamed); the arm calls `::core::write!(f, <format string> [, <arguments>])`; from `0.8`, an arm whose message is a plain string first rebinds each field to `$crate::__private::shown_of!(field)` (under the field's own `#[cfg]`), so a `Path`, `&Path`, or `PathBuf` shows through `display()` as with thiserror and every other field is the same reference as before; a message with arguments is left as written; `transparent` arms call `::core::fmt::Display::fmt(inner, f)`; `#[allow(unused_variables)]` on the match |
 | G3 | `impl ::core::error::Error for T` | `source()`: per variant, `$crate::__private::source_of!(field)` for the source field, `transparent` forwards to the inner value's own `source()` through `$crate::__private::forward_source!(inner)`, otherwise `None`; from `0.4`, `description()`: per variant the identity probe string, under `#[allow(deprecated)]`; `transparent` arms forward the inner probe when the inner value has one |
 | G4 | `impl ::core::convert::From<S> for T` | one per `#[from]` field; `#[track_caller]`; sets a `#[location]` field to `::core::panic::Location::caller()` |
 | G5 | `impl $crate::ErrorInfo for T` | always generated; methods with no per-variant data are left to the trait defaults; others are one `match self` returning constants or copying a field |
@@ -115,12 +115,20 @@ impl ::core::fmt::Display for PageError {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         #[allow(unused_variables)]
         match self {
-            Self::NotFound { page } => ::core::write!(f, "page {page} not found"),
-            Self::BadMagic { found, expected } => ::core::write!(
-                f,
-                "bad page magic: found {found:#010x}, expected {expected:#010x}"
-            ),
-            Self::ShortRead(page, got) => ::core::write!(f, "short read on page {page}: got {got} bytes"),
+            Self::NotFound { page } => {
+                let page = $crate::__private::shown_of!(page);
+                ::core::write!(f, "page {page} not found")
+            }
+            Self::BadMagic { found, expected } => {
+                let found = $crate::__private::shown_of!(found);
+                let expected = $crate::__private::shown_of!(expected);
+                ::core::write!(f, "bad page magic: found {found:#010x}, expected {expected:#010x}")
+            }
+            Self::ShortRead(page, got) => {
+                let page = $crate::__private::shown_of!(page);
+                let got = $crate::__private::shown_of!(got);
+                ::core::write!(f, "short read on page {page}: got {got} bytes")
+            }
             Self::InvalidSuperblock => ::core::write!(f, "page 0 is not a valid allocator superblock"),
         }
     }
@@ -735,17 +743,20 @@ Rules the macro itself rejects with `compile_error!` (each names the fix, and ea
 | `forward_source!` | `forward_source!(expr) -> Option<&(dyn Error + 'static)>` | the inner value's own `source()` for transparent variants, including boxed trait objects | 0.3 |
 | `info_of!` | `info_of!(expr) -> Option<&dyn ErrorInfo>` | `ErrorInfo` forwarding for transparent variants | 0.3 |
 | `Wrap`, dispatch traits | `struct Wrap<'a, T: ?Sized>(pub &'a T)`; `SourceViaError`, `SourceViaOption`, `SourceViaObject`, `SourceViaNothing`, `ForwardViaError`, `ForwardViaObject`, `InfoViaErrorInfo`, `InfoViaNothing` | the autoref dispatch behind the three macros above | 0.3 |
+| `shown_of!` | `shown_of!(expr: &T)`: a `std::path::Display` for `Path`, `&Path`, and `PathBuf` with `std`; the same `&T` for every other type (`ShownViaPath`, `ShownViaAny`) | what a plain message shows for a field; zero cost after inlining | 0.8 |
 | `SourceField` | `trait SourceField` with `#[diagnostic::on_unimplemented]`, implemented for every `E: Error` | the compile error for a source field that is not an error | 0.3 |
 | internal macros | `__define_err_block!`, `__define_err_type!`, `__define_err_meta_slot!`, `__define_err_enum!`, `__define_err_fields!`, `__define_err_emit!`, `__define_err_catalog!`, `__define_err_ns!`, `__define_err_code!`, `__define_err_value!`, `__define_err_forward!`, `__define_err_probe!`, `__define_err_fmt!`, `__define_err_source!`, `__define_err_location!`, `__define_err_transparent!`, `__define_err_from!` | the parser and the emitter (`#[doc(hidden)]`, exported because `macro_rules!` helpers must be); the attribute front end calls none of them | 0.3, extended in 0.4 |
 | `retry_after_of!` | `retry_after_of!(expr) -> Option<Duration>` | `#[retry_after]` fields of type `Duration` or `Option<Duration>` (`RetryViaDuration`, `RetryViaOption`) | 0.4 |
 | `description_of!` | `description_of!(expr) -> &str` | the inner value's `description()` for transparent probes, including boxed trait objects (`DescribeViaError`, `DescribeViaObject`) | 0.4 |
 | `namespace` | `const fn namespace(text: &str, width: u8) -> Namespace` | the block's namespace, in the block's check; panics in const evaluation on invalid input | 0.4 |
 | `namespace_or_placeholder` | `const fn namespace_or_placeholder(text: &str, width: u8) -> Namespace` | the namespace everywhere else; never fails | 0.4 |
-| `code` | `const fn code(namespace: Namespace, number: u32) -> Code` | a code, in the block's check; panics in const evaluation when out of range | 0.4 |
+| `code` | `const fn code(namespace: Namespace, number: u32) -> Code` | a code constant from `code!`, and the range check inside `check_number`; panics in const evaluation when out of range | 0.4 |
 | `code_or_placeholder` | `const fn code_or_placeholder(namespace: Namespace, number: u32) -> Code` | a code everywhere else; never fails | 0.4 |
 | `retired_code` | `const fn retired_code(namespace: Namespace, number: u32) -> CodeInfo` | a retired catalog entry | 0.4 |
 | `severity` | `const fn severity<const N: u8>() -> Severity` | a numeric severity, checked at compile time | 0.4 |
-| `check_block` | `const fn check_block(duplicate_message: &str, numbers: &[u32], retired: &[u32], replacements: &[&[(u32, u32)]])` | duplicates and replacements; panics in const evaluation | 0.4 |
+| `check_block` | `const fn check_block(duplicate_message: &str, numbers: &[u32], retired: &[u32], replacements: &[&[(u32, u32)]])` | duplicates and replacements; panics in const evaluation; from `0.8` skips `INVALID_NUMBER` | 0.4 |
+| `check_number` | `const fn check_number(namespace: Namespace, number: u32)` | one number's range check in the block's check, skipping `INVALID_NUMBER` | 0.8 |
+| `INVALID_NUMBER` | `const INVALID_NUMBER: u32 = u32::MAX` | stands in for a `#[code]` with no number literal, whose own error is already reported; a `#[code]` with a literal but another fault keeps its literal | 0.8 |
 | `catalog_len`, `catalog` | `const fn catalog_len(parts: &[&[CodeInfo]]) -> usize`; `const fn catalog<const N: usize>(parts: &[&[CodeInfo]]) -> [CodeInfo; N]` | build a type's `CATALOG` from per-variant parts | 0.4 |
 | `check_docs` | `const fn check_docs(template: &str)` | the docs template has a placeholder | 0.4 |
 | `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong or non-ASCII name or an overlong public message | 0.5 |
