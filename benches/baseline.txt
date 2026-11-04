@@ -1,25 +1,25 @@
-# Floors from benches/floor.rs: Ryzen 9 9950X3D, WSL2 Ubuntu, rustc 1.99.0, 2026-11-02.
-# Compare with tools/bench-compare.py. Method: docs/PERFORMANCE.md.
-empty_loop                             0.26 ns
-code_display                          28.02 ns
-code_parse                             8.69 ns
-code_from_u64                          3.29 ns
-error_info_code                        0.24 ns
-identify_generated                    25.62 ns
-identify_foreign                       1.80 ns
-not_installed_report                   0.44 ns
-not_installed_notice                   0.51 ns
-not_installed_notice_macro             0.35 ns
-not_installed_warn                     0.50 ns
-not_installed_warn_macro               0.27 ns
-not_installed_log_warn                 0.33 ns
-warn_macro_after_first                 0.50 ns
-warn_after_first                       9.48 ns
-filtered_report                        5.94 ns
-filtered_report_with                   0.72 ns
-filtered_notice                        2.67 ns
-filtered_log_warn                      0.34 ns
-delivered_report                      33.13 ns
-delivered_report_foreign              10.14 ns
-delivered_notice                       6.22 ns
-delivered_log_error                    3.50 ns
+# Floors from benches/floor.rs: Ryzen 9 9950X3D, WSL2 Ubuntu, rustc 1.99.0, 2026-11-03,
+# version 0.7.0, best of four runs. Compare with tools/bench-compare.py. Method: docs/PERFORMANCE.md.
+empty_loop                             0.22 ns
+code_display                          25.48 ns
+code_parse                             7.71 ns
+code_from_u64                          3.06 ns
+error_info_code                        0.23 ns
+identify_generated                    22.89 ns
+identify_foreign                       1.62 ns
+not_installed_report                   0.37 ns
+not_installed_notice                   0.48 ns
+not_installed_notice_macro             0.25 ns
+not_installed_warn                     0.38 ns
+not_installed_warn_macro               0.31 ns
+not_installed_log_warn                 0.31 ns
+warn_macro_after_first                 0.47 ns
+warn_after_first                       7.01 ns
+filtered_report                        5.65 ns
+filtered_report_with                   0.64 ns
+filtered_notice                        2.39 ns
+filtered_log_warn                      0.42 ns
+delivered_report                      31.20 ns
+delivered_report_foreign              10.66 ns
+delivered_notice                       5.12 ns
+delivered_log_error                    2.86 ns

@@ -56,3 +56,10 @@ path = "fuzz_targets/record_from_chain.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "kinds_display"
+path = "fuzz_targets/kinds_display.rs"
+test = false
+doc = false
+bench = false

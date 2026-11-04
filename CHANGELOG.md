@@ -13,6 +13,30 @@
 
 ---
 
+## [0.7.0] - 2026-11-04
+
+Hardening. Every threat in `docs/SECURITY.md` has a passing attack test,
+each of the seven fuzz targets ran 24 hours with no finding, and every verb
+ran from 64 threads for 8 hours with exact counts and flat memory. No public
+API changes.
+
+### Added
+
+- `docs/SECURITY.md`: threats T1 to T17 with each defence, its cost, and its test, and what is not defended, forged probes above all.
+- `docs/ARCHITECTURE.md` and `docs/PLATFORM-NOTES.md`.
+- Attack tests for every threat (`tests/attack*.rs`), a stress and soak of every verb from 64 threads (`tests/stress.rs`), and the fuzz target `kinds_display`.
+
+### Fixed
+
+- A panic in a reported error's own `description()` is contained like a panic in `receive`, and counted in `stats().reporter_panics`. It used to unwind into the caller of `report`, `report_with`, or `soft`. Cost: a filtered `report` takes about 0.4 ns more, a delivered report of a foreign error about 1.5 ns more; `docs/PERFORMANCE.md` has the figures.
+
+### Changed
+
+- The panic guard checks and sets its flag in one thread-local access.
+- `benches/baseline.txt` holds 0.7.0's floors.
+
+---
+
 ## [0.6.0] - 2026-11-03
 
 Optimisation. Every target in `dev/PLAN.md` 11.1 is met or has a reviewed
@@ -310,7 +334,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jamesgober/define-err/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/define-err/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/define-err/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jamesgober/define-err/compare/v0.3.0...v0.4.0

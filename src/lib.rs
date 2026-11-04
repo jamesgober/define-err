@@ -145,9 +145,10 @@
 //!
 //! ## Status
 //!
-//! `0.6.0`: feature complete and measured. The public API of 1.0 is written in
-//! `docs/API.md` and what the macro expands to in `docs/GENERATED-CODE.md`
-//! (both in the [repository](https://github.com/jamesgober/define-err)).
+//! `0.7.0`: feature complete, measured, and hardened. The public API of 1.0
+//! is written in `docs/API.md` and what the macro expands to in
+//! `docs/GENERATED-CODE.md` (both in the
+//! [repository](https://github.com/jamesgober/define-err)).
 
 #![no_std]
 #![doc(html_root_url = "https://docs.rs/define-err")]

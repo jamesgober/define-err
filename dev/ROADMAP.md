@@ -62,10 +62,10 @@ Exit: `docs/PERFORMANCE.md` published with dates, hardware, and method.
 - [x] Assembly inspection of the empty facade path (one load and a branch).
 - [x] Every target in 11.1 met or a reviewed reason recorded (D-060).
 
-## v0.7.0 - Hardening
+## v0.7.0 - Hardening (DONE, 2026-11-04)
 Exit: no open fuzz finding; every threat has a passing attack test.
-- [ ] Every fuzz target 24 hours; attack tests T1 to T17; Miri over the suite; loom models complete; 8-hour soak.
-- [ ] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
+- [x] Every fuzz target 24 hours; attack tests T1 to T17; Miri over the suite; loom models complete; 8-hour soak.
+- [x] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
 
 ## v0.8.0 - Alpha: first migrations
 Exit: each migrated crate's CI is green on its own repository against the published 0.8.0.

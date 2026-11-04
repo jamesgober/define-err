@@ -32,7 +32,7 @@
         <strong>MSRV is 1.81+</strong> (Rust 2021 edition): the first release with <code>core::error::Error</code>.
     </p>
     <blockquote>
-        <strong>Status: feature complete and measured (<code>0.6.0</code>).</strong> <code>define_errors!</code> has thiserror parity and optional codes, a compile-time catalog, severity, categories, kinds, public messages, and retry advice. The reporting facade, <code>ErrorRecord</code>, and test capture are in. The releases before 1.0 are for tuning, hardening, and migrating real crates. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
+        <strong>Status: feature complete, measured, and hardened (<code>0.7.0</code>).</strong> <code>define_errors!</code> has thiserror parity and optional codes, a compile-time catalog, severity, categories, kinds, public messages, and retry advice. The reporting facade, <code>ErrorRecord</code>, and test capture are in. The releases before 1.0 are for tuning, hardening, and migrating real crates. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
     </blockquote>
 </div>
 
@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.6.0"
+define-err = "0.7.0"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.6.0", default-features = false }            # core only
-define-err = { version = "0.6.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.7.0", default-features = false }            # core only
+define-err = { version = "0.7.0", default-features = false, features = ["alloc"] }
 ```
 
 ## Quick start
@@ -172,7 +172,7 @@ fn main() {
 
 Errors are values in Rust; there is no throw event. The facade sees an error only when code calls one of its verbs. It cannot see an error discarded with `let _ =`, `.ok()`, or `unwrap_or`, or a typed error that is built and never reported.
 
-Measured costs, against thiserror, `log`, and error-forge, are in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md). See [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to the other error libraries (dynamic errors, rendering, diagnostics, the error service), and the decision log.
+Measured costs, against thiserror, `log`, and error-forge, are in [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md). The threat model, each defence with its cost and its test, and what is not defended are in [`docs/SECURITY.md`](./docs/SECURITY.md); how the crate is built is in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), and what differs by target and feature in [`docs/PLATFORM-NOTES.md`](./docs/PLATFORM-NOTES.md). See [`dev/PLAN.md`](./dev/PLAN.md) for the full scope, what is deliberately left to the other error libraries (dynamic errors, rendering, diagnostics, the error service), and the decision log.
 
 ## Features
 

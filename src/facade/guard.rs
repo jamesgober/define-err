@@ -30,10 +30,11 @@ mod imp {
 
     /// Runs `call` as a reporter call.
     pub(crate) fn run(call: impl FnOnce()) {
-        if refuses() {
+        // One access checks the flag and sets it.
+        if INSIDE.try_with(|flag| flag.replace(true)).unwrap_or(false) {
+            state::count_reentrant();
             return;
         }
-        let _ = INSIDE.try_with(|flag| flag.set(true));
         let outcome = catch_unwind(AssertUnwindSafe(call));
         let _ = INSIDE.try_with(|flag| flag.set(false));
         if let Err(payload) = outcome {
