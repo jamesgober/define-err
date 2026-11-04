@@ -80,3 +80,34 @@ fn test_enum_with_every_variant_off_is_a_type() {
     assert_info::<Empty>();
     assert_eq!(core::mem::size_of::<Empty>(), 0);
 }
+
+define_errors! {
+    namespace = "CFG";
+
+    /// A whole type compiled out: none of its impls are left behind.
+    #[cfg(any())]
+    pub enum Absent {
+        #[code(1, help = "Never compiled.")]
+        Off { value: NotDefinedAnywhere } => "off {value}",
+    }
+
+    /// A whole type compiled in, with other attributes beside the `cfg`.
+    #[cfg(all())]
+    #[derive(Clone)]
+    pub enum Present {
+        #[code(2, help = "Compiled.")]
+        On { n: u8 } => "on {n}",
+    }
+
+    #[cfg(any())]
+    pub struct AbsentStruct {
+        pub value: NotDefinedAnywhere,
+    } => "absent {value}";
+}
+
+#[test]
+fn test_cfg_on_a_type_covers_its_impls() {
+    let on = Present::On { n: 1 };
+    assert_eq!(on.clone().to_string(), "on 1");
+    assert_eq!(on.code().unwrap().to_string(), "CFG-0002");
+}

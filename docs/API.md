@@ -578,6 +578,8 @@ Each mistake is reported once, at the place it was written. A numeric severity o
 
 `#[cfg]` on a variant, or on a plain field of a braced variant or struct, compiles that part in or out with your own features. Every generated arm, `From` impl, catalog entry, and check follows it, so two variants with the same number under exclusive conditions are fine.
 
+`#[cfg]` on a whole type (since `0.8`) compiles the type and every impl for it in or out together. Its codes still count in the block's duplicate check, so two alternative definitions of one type under exclusive conditions belong in separate `define_errors!` blocks.
+
 ```rust
 define_errors! {
     namespace = "NET";

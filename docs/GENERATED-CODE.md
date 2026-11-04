@@ -60,6 +60,7 @@ The expansions are shown in the shape of a hand-written impl, for reading. The r
 - every arm matches `*self` and binds every field with `ref` (`match *self { Self::NotFound { ref page } => ... }`), which gives the same `&T` bindings and also works for an enum with no variants;
 - `source()` and `ErrorInfo::location` are always a full `match`, returning `None` for variants that have no source or location (PLAN D-025);
 - each generated impl carries `#[allow(deprecated)]`, so a `#[deprecated]` variant warns where the user names it, never inside generated code;
+- from `0.8`, a type that carries `#[cfg(...)]` gets its impls inside one `const _: () = { ... };` with those `cfg` attributes copied from the input (and no other attribute), so the impls go wherever the type goes; a type without `#[cfg]` gets them at the top level as shown;
 - unnamed tuple fields are bound as `__define_err_source` (a `#[from]` or `#[source]` field), `__define_err_location` (a `#[location]` field), or `__define_err_0` to `__define_err_15` (any other), and the `From` parameter is `__define_err_value`; these names are hygienic and never clash with the user's.
 
 ## Items generated for every type

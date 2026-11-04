@@ -60,6 +60,8 @@ mod ours {
         pub struct Braced { pub line: u32 } => "braced {line}";
         pub struct Tupled(pub source: std::io::Error) => "tupled";
 
+        // Paths show through `display()` with the `std` feature.
+        #[cfg(feature = "std")]
         pub enum Paths {
             Owned { file: std::path::PathBuf } => "failed to read '{file}'",
             Tuple(file: std::path::PathBuf) => "failed to read {file:?} as '{file}'",
@@ -138,6 +140,7 @@ mod theirs {
     #[error("tupled")]
     pub struct Tupled(#[source] pub std::io::Error);
 
+    #[cfg(feature = "std")]
     #[derive(Debug, thiserror::Error)]
     pub enum Paths {
         #[error("failed to read '{file}'")]
@@ -260,6 +263,7 @@ fn test_conformance_structs() {
 
 /// A `PathBuf` named in a plain message shows through `display()`, and
 /// `{:?}` keeps the path's own `Debug`.
+#[cfg(feature = "std")]
 #[test]
 fn test_conformance_paths() {
     use ours::Paths as O;
@@ -271,6 +275,7 @@ fn test_conformance_paths() {
 
 /// A `&Path` field works too, which thiserror does not accept, with its
 /// format spec.
+#[cfg(feature = "std")]
 #[test]
 fn test_borrowed_path_shows_through_display() {
     let file = std::path::Path::new("x/y.kr");

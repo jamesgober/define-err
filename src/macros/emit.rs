@@ -40,13 +40,15 @@ macro_rules! __define_err_emit {
 
         $( $crate::__define_err_code!(@check $ns [$($code)?]); )*
 
-        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
-            ( $vcfg [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
-              $(( $( { $xrole $xname : $xty } )* ))?
-              => $msg )
-        )* ] }
+        $crate::__define_err_cfg! { [$($tattr)*] [] {
+            $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
+                ( $vcfg [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
+                  [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
+                  $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
+                  $(( $( { $xrole $xname : $xty } )* ))?
+                  => $msg )
+            )* ] }
+        } }
 
         $crate::__define_err_block! {
             @types [$ns $docs $rall [] [$($acc)* $( $( { $vcfg $code } )? )*]] $($rest)*
@@ -67,13 +69,15 @@ macro_rules! __define_err_emit {
 
         $crate::__define_err_code!(@check $ns [$($code)?]);
 
-        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
-            ( [] [Self] [::core::stringify!($name)] [::core::stringify!($name)]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
-              $(( $( { $xrole $xname : $xty } )* ))?
-              => $msg )
-        ] }
+        $crate::__define_err_cfg! { [$($tattr)*] [] {
+            $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
+                ( [] [Self] [::core::stringify!($name)] [::core::stringify!($name)]
+                  [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
+                  $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
+                  $(( $( { $xrole $xname : $xty } )* ))?
+                  => $msg )
+            ] }
+        } }
 
         $crate::__define_err_block! {
             @types [$ns $docs $rall [] [$($acc)* $( { [] $code } )?]] $($rest)*
@@ -666,6 +670,30 @@ macro_rules! __define_err_probe {
         const __DEFINE_ERR_TEXT: &str = __DEFINE_ERR_PROBE.as_str();
         __DEFINE_ERR_TEXT
     }};
+}
+
+/// The impls of a type that carries `#[cfg]`: its `cfg` attributes, and no
+/// other, on one `const _` block that holds them, so they go wherever the type
+/// goes. A type without `#[cfg]` gets its impls as they are. The attributes
+/// are always copied from the user's input.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __define_err_cfg {
+    ([#[cfg $($c:tt)*] $($rest:tt)*] [$($keep:tt)*] $body:tt) => {
+        $crate::__define_err_cfg! { [$($rest)*] [$($keep)* #[cfg $($c)*]] $body }
+    };
+    ([#[$($other:tt)*] $($rest:tt)*] [$($keep:tt)*] $body:tt) => {
+        $crate::__define_err_cfg! { [$($rest)*] [$($keep)*] $body }
+    };
+    ([] [] { $($body:tt)* }) => {
+        $($body)*
+    };
+    ([] [$($keep:tt)+] { $($body:tt)* }) => {
+        $($keep)+
+        const _: () = {
+            $($body)*
+        };
+    };
 }
 
 /// The body of one `Display` arm. A plain message names fields only inside

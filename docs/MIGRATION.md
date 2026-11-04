@@ -17,7 +17,7 @@ A crate can move from route 2 to route 1 later with no change its users can see.
 | `#[error("page {page_id} not found")] NotFound { page_id: u64 },` | `NotFound { page_id: u64 } => "page {page_id} not found",` |
 | `#[error("page i/o error: {0}")] Io(#[from] io::Error),` | `Io(#[from] source: io::Error) => "page i/o error: {source}",` |
 | `#[error("invalid usage: {0}")] InvalidUsage(String),` | `InvalidUsage(detail: String) => "invalid usage: {detail}",` |
-| `#[error("file not found: {0}")] NotFound(PathBuf),` | `NotFound(path: PathBuf) => "file not found: {path}",`: a `Path`, `&Path`, or `PathBuf` shows through `display()`, as with thiserror (since 0.8; on 0.7, write `("file not found: {}", path.display())`) |
+| `#[error("file not found: {0}")] NotFound(PathBuf),` | `NotFound(path: PathBuf) => "file not found: {path}",`: a `Path`, `&Path`, or `PathBuf` shows through `display()`, as with thiserror (since 0.8, with the `std` feature; on 0.7, write `("file not found: {}", path.display())`) |
 | `#[error("{}", .diagnostic.format())] Diag { diagnostic: D },` | `Diag { diagnostic: D } => ("{}", diagnostic.format()),` |
 | `#[error("size {size} not in {min}..={max}", min = crate::MIN, max = crate::MAX)]` | `=> ("size {size} not in {min}..={max}", min = crate::MIN, max = crate::MAX)` |
 | `#[error(transparent)] Other(#[from] OtherError),` | `Other(#[from] inner: OtherError) => transparent,` |

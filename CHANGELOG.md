@@ -21,10 +21,12 @@
 ### Fixed
 
 - A `PathBuf`, `Path`, or `&Path` field named in a plain message shows
-  through `display()`, as with thiserror. It used to be a compile error
+  through `display()`, as with thiserror (with the `std` feature, a default). It used to be a compile error
   (`PathBuf` does not implement `Display`), so a thiserror message such as
   `"file not found: {0}"` on a `PathBuf` could not be kept as written. Every
   other field formats exactly as before.
+- `#[cfg(...)]` on a whole type compiles out its impls with it. They used to
+  stay, and fail to compile once the type was gone.
 - A `#[code]` without `help`, or with its fields out of order, reports that
   one error. Two of them in a block also reported a false duplicate code.
 
@@ -33,8 +35,9 @@
 - A plain message's `Display` arm rebinds each field through
   `__private::shown_of!` first. New `__private` items: `shown_of!`,
   `ShownViaPath`, `ShownViaAny`, `check_number`, `INVALID_NUMBER`.
-  `check_block` skips `INVALID_NUMBER`. `docs/GENERATED-CODE.md` has the
-  details.
+  `check_block` skips `INVALID_NUMBER`. The impls of a type with `#[cfg]`
+  sit in one `const _` block carrying those `cfg` attributes.
+  `docs/GENERATED-CODE.md` has the details.
 
 ---
 
