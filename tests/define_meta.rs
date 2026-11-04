@@ -13,7 +13,7 @@ pub const BILLING: Kinds = Kinds::project::<0>();
 
 define_errors! {
     namespace = "DB";
-    docs = "https://docs.hivedb.com/errors/{code}";
+    docs = "https://docs.example.com/errors/{code}";
     retired = [9, 12];
 
     /// Errors from the query layer.
@@ -167,7 +167,7 @@ fn test_catalog_entries_titles_docs_and_retired() {
     assert_eq!(timeout.public, "The database is busy. Try again shortly.");
     assert_eq!(
         timeout.url().unwrap().to_string(),
-        "https://docs.hivedb.com/errors/DB-0001"
+        "https://docs.example.com/errors/DB-0001"
     );
     assert!(timeout.is_active());
 
@@ -298,10 +298,10 @@ fn test_transparent_forwards_metadata_and_probe() {
 }
 
 define_errors! {
-    namespace = "DIS", width = 5;
+    namespace = "SVC", width = 5;
 
-    pub enum DistroError {
-        #[code(1, help = "Fix the named field in distro.noml.")]
+    pub enum ServiceError {
+        #[code(1, help = "Fix the named field in service.noml.")]
         #[category(InvalidArgument)]
         #[action(FixConfig)]
         Config { field: String, reason: String } => "configuration error [{field}]: {reason}",
@@ -315,15 +315,15 @@ define_errors! {
 
 #[test]
 fn test_five_digit_codes() {
-    let err = DistroError::Config {
+    let err = ServiceError::Config {
         field: "port".into(),
         reason: "not a number".into(),
     };
-    assert_eq!(err.code().unwrap().to_string(), "DIS-00001");
+    assert_eq!(err.code().unwrap().to_string(), "SVC-00001");
     assert_eq!(err.action(), Action::FixConfig);
     assert_eq!(
         identify(&err).unwrap().code.unwrap().to_string(),
-        "DIS-00001"
+        "SVC-00001"
     );
 }
 

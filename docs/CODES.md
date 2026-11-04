@@ -10,13 +10,13 @@ A code is a namespace and a number.
 |---|---|
 | Namespace | 1 to 6 characters, `A` to `Z` and `0` to `9`, starting with a letter. Lowercase is accepted and stored uppercase. |
 | Number | 0 to 16,777,215. 0 is the namespace's generic code. |
-| Width | The digits shown, 1 to 8, default 4. Presentation only: `DIS-1` and `DIS-00001` are the same code. A number wider than the width is shown in full. |
+| Width | The digits shown, 1 to 8, default 4. Presentation only: `SVC-1` and `SVC-00001` are the same code. A number wider than the width is shown in full. |
 
 A `Code` packs into a `u64`, is never zero (so `Option<Code>` is 8 bytes), and is compared, ordered, and hashed by namespace text and number, the width ignored. The packing is frozen at 1.0; [`tests/golden/codes.txt`](../tests/golden/codes.txt) holds it.
 
 ## Namespaces
 
-One namespace per domain, in one `define_errors!` block or several. Pick something short and specific: `DB`, `DIS`, `EXE`, `AUTH`. The same number in two namespaces is two codes.
+One namespace per domain, in one `define_errors!` block or several. Pick something short and specific: `DB`, `SVC`, `JOB`, `AUTH`. The same number in two namespaces is two codes.
 
 A block checks its own numbers at compile time. Numbers across crates cannot be checked by a compiler, so `catalog::check_unique` does it at start-up or in a test, and the error service runs the same check over every catalog it loads:
 
@@ -90,12 +90,12 @@ Codes identify an error; they do not authenticate it. A foreign type can write a
 A code inside a message string becomes an attribute, so `err.code()` works and the message reads the same:
 
 ```rust
-// Before: #[error("DIS-00001: configuration error [{field}]")]
+// Before: #[error("SVC-00001: configuration error [{field}]")]
 define_errors! {
-    namespace = "DIS", width = 5;
+    namespace = "SVC", width = 5;
 
-    pub enum DistroError {
-        #[code(1, help = "Fix the named field in distro.noml.")]
+    pub enum ServiceError {
+        #[code(1, help = "Fix the named field in service.noml.")]
         Config { field: String } => "configuration error [{field}]",
     }
 }

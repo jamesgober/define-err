@@ -333,8 +333,8 @@ impl CodeInfo {
     /// use define_err::{code, CodeInfo};
     ///
     /// const INFO: CodeInfo = CodeInfo::new(code!("DB", 1), "Timeout", "Raise pool.size.")
-    ///     .with_docs("https://docs.hivedb.com/errors/{code}");
-    /// assert_eq!(INFO.url().unwrap().to_string(), "https://docs.hivedb.com/errors/DB-0001");
+    ///     .with_docs("https://docs.example.com/errors/{code}");
+    /// assert_eq!(INFO.url().unwrap().to_string(), "https://docs.example.com/errors/DB-0001");
     /// ```
     #[must_use]
     pub fn url(&self) -> Option<UrlDisplay<'_>> {

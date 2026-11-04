@@ -417,7 +417,7 @@ pub const BILLING: Kinds = Kinds::project::<0>();
 
 define_errors! {
     namespace = "DB";
-    docs = "https://docs.hivedb.com/errors/{code}";
+    docs = "https://docs.example.com/errors/{code}";
 
     pub enum DbError {
         #[code(1, name = TIMEOUT, help = "Raise pool.size or lower the load.")]
@@ -466,7 +466,7 @@ impl DbError {
                 .with_action($crate::Category::default_action($crate::Category::DeadlineExceeded))
                 .with_public("The database is busy. Try again shortly.")
                 .with_type_name("DbError::Timeout")
-                .with_docs("https://docs.hivedb.com/errors/{code}")
+                .with_docs("https://docs.example.com/errors/{code}")
                 .with_state($crate::CodeState::Active)],
             // DB-0002, DB-0003, DB-0010 in the same shape; a variant without
             // a code contributes `&[]`.
@@ -575,7 +575,7 @@ const _: () = {
         &[],
         &[&[], &[], &[], &[]],
     );
-    $crate::__private::check_docs("https://docs.hivedb.com/errors/{code}");
+    $crate::__private::check_docs("https://docs.example.com/errors/{code}");
     #[deny(unreachable_patterns)]
     match 0_u32 { 1 => {} 2 => {} 3 => {} 10 => {} _ => {} }
 };

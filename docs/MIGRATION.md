@@ -24,7 +24,7 @@ A crate can move from route 2 to route 1 later with no change its users can see.
 | `#[source] cause: E`, or a field named `source` | unchanged |
 | `#[non_exhaustive]` on the enum | keep it or delete it: the macro adds it when absent and never adds a second copy |
 | an enum published as exhaustive | add `#[exhaustive]`, so the migration is not a breaking change |
-| a code inside the message: `#[error("DIS-00001: configuration error [{field}]")]` | `namespace = "DIS", width = 5;`, `#[code(1, help = "...")]`, and the message without the prefix; or keep the prefix in the message, so `Display` stays byte-identical, and state the code again in `#[code]` |
+| a code inside the message: `#[error("SVC-00001: configuration error [{field}]")]` | `namespace = "SVC", width = 5;`, `#[code(1, help = "...")]`, and the message without the prefix; or keep the prefix in the message, so `Display` stays byte-identical, and state the code again in `#[code]` |
 | an existing code with no explanation | every `#[code]` needs `help = "..."`: the catalog ships each code with what to do about it |
 
 Tuple fields get a name, `Read(page: u64, got: usize)`, so the message can use it: a declarative macro cannot look inside a string literal for `{0}`. The field is still positional when the variant is built, `ShortRead(7, 12)`.

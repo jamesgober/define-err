@@ -148,10 +148,10 @@ define_errors! {
 }
 
 define_errors! {
-    namespace = "DIS", width = 5;
+    namespace = "SVC", width = 5;
 
-    pub enum DistroError {
-        #[code(1, help = "Fix the named field in distro.noml.")]
+    pub enum ServiceError {
+        #[code(1, help = "Fix the named field in service.noml.")]
         #[category(InvalidArgument)]
         Config => "configuration error",
     }
@@ -175,7 +175,7 @@ fn test_golden_probe_strings() {
         ("DbError::Timeout", &DbError::Timeout),
         ("DbError::Corrupt", &DbError::Corrupt),
         ("DbError::Quota", &DbError::Quota),
-        ("DistroError::Config", &DistroError::Config),
+        ("ServiceError::Config", &ServiceError::Config),
         ("PageError::NotFound", &PageError::NotFound),
         ("AppError::Other", &AppError::Other(std::fmt::Error)),
         ("Cancelled", &Cancelled),

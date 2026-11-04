@@ -92,7 +92,7 @@ use define_err::prelude::*;     // define_errors!, ErrorInfo (for .code(), .cate
 
 define_errors! {
     namespace = "DB";
-    docs = "https://docs.hivedb.com/errors/{code}";
+    docs = "https://docs.example.com/errors/{code}";
 
     pub enum DbError {
         #[code(1, help = "Raise pool.size or lower the load.")]
@@ -135,7 +135,7 @@ define_err::warn("cache file is stale, rebuilding");   // once per call site
 
 | User | What it uses |
 |---|---|
-| Every portfolio library that declares errors (page-db, wal-db, lsm-db, txn-db, index-db, config-lib, noml-rust, mod-cli, kraken, Hive DB distro and hive-exec, the net and sec collections) | `define_errors!`, `ErrorInfo`, optionally codes, categories, `Secret<T>`, the facade verbs |
+| Every portfolio library that declares errors (page-db, wal-db, lsm-db, txn-db, index-db, config-lib, noml-rust, mod-cli, kraken, internal consumers, the net and sec collections) | `define_errors!`, `ErrorInfo`, optionally codes, categories, `Secret<T>`, the facade verbs |
 | L2 derive | generates the code of 7.5 against this crate's public and `__private` items |
 | L3 report (anyhow replacement) | `ErrorInfo`, `identify()` (the identity probe, 7.11) to find the innermost coded error through a `dyn Error` chain, `ErrorRecord`, `Location` |
 | L4 render | `Code`, `Category` (HTTP status, exit code), `Severity` names, `CodeInfo` (title, help, URL), public messages, `ErrorRecord` |
@@ -643,7 +643,7 @@ pub const BILLING: Kinds = Kinds::project::<0>();
 
 define_errors! {
     namespace = "DB";
-    docs = "https://docs.hivedb.com/errors/{code}";
+    docs = "https://docs.example.com/errors/{code}";
     retired = [9, 12];
 
     /// Errors from the query layer.
@@ -691,12 +691,12 @@ define_errors! {
     }
 }
 
-// Hive DB style, five-digit codes (DIS-00001):
+// Five-digit codes (SVC-00001):
 define_errors! {
-    namespace = "DIS", width = 5;
+    namespace = "SVC", width = 5;
 
-    pub enum DistroError {
-        #[code(1, help = "Fix the named field in distro.noml.")]
+    pub enum ServiceError {
+        #[code(1, help = "Fix the named field in service.noml.")]
         #[category(InvalidArgument)]
         #[action(FixConfig)]
         Config { field: String, reason: String } => "configuration error [{field}]: {reason}",
@@ -908,7 +908,7 @@ A `Code` is a namespace plus a number, stored in one `u64` so filtering, sorting
 ```
 
 - **Namespace (32 bits).** Up to six characters from `A`-`Z` and `0`-`9`, first character a letter, packed as a base-37 number with the first character most significant and 0 as the padding after the last character (37^6 = 2,565,726,409 fits in 32 bits). The text is recovered from the integer alone, so a code displays without any catalog or registry, and numeric order of the field equals alphabetical order of the text. Lowercase input is accepted and stored uppercase.
-- **Width (3 bits).** Display width of the number minus one (1 to 8 digits, default 4), so Hive DB's `DIS-00001` style keeps its five digits. Width is presentation, not identity: equality, ordering, and hashing use `identity()` (the `u64` with the width bits cleared), so `DIS-1`, `DIS-0001`, and `DIS-00001` are the same code.
+- **Width (3 bits).** Display width of the number minus one (1 to 8 digits, default 4), so a `SVC-00001` style keeps its five digits. Width is presentation, not identity: equality, ordering, and hashing use `identity()` (the `u64` with the width bits cleared), so `SVC-1`, `SVC-0001`, and `SVC-00001` are the same code.
 - **Reserved (5 bits).** Zero in 1.x. `from_u64` rejects non-zero reserved bits, which keeps them available (for example a "vendor" bit, as in HRESULT's customer bit) without ambiguity.
 - **Number (24 bits).** 0 to 16,777,215. Number 0 is the namespace's generic code (the error-suite plan, 4.3, after SQLSTATE `XX000`).
 - **Text form.** `NS-` followed by the number zero-padded to the width; numbers wider than the width print in full (`DB-12345` with width 4).
@@ -2043,7 +2043,7 @@ API: DEF-13 to DEF-23, DEF-25 · CODE-01 to CODE-09 · SEV-01 to SEV-04 · CAT-0
 - Category tables and kind bits locked against the golden files.
 - Edge cases E-33 to E-64, E-87 to E-89.
 
-**Exit:** the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; Hive DB distro's five-digit codes display identically (`DIS-00001`).
+**Exit:** the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; five-digit codes display identically (`SVC-00001`).
 
 ### 0.5.0 - Feature complete: facade and record
 
@@ -2073,7 +2073,7 @@ API: FAC-01 to FAC-18 · REC-01 to REC-06 · TST-01, TST-02 · DEF-24.
 
 ### 0.8.0 - Alpha: first migrations
 
-- Migrate page-db, Hive DB distro, Hive DB hive-exec (MSRV 1.85 crates, small or piloted) using `define_errors!`; migrate kraken (raising it to 1.81).
+- Migrate page-db and an internal consumer's two crates (MSRV 1.85 crates, small or piloted) using `define_errors!`; migrate kraken (raising it to 1.81).
 - Remove the unused `thiserror` dependency from cli-forge.
 - Feedback from each migration recorded; fixes land here.
 
@@ -2136,7 +2136,7 @@ Copied from the portfolio library standard (section 3.) James's instruction (202
 11. CI green on Linux, macOS, Windows, stable and MSRV, four feature modes; `no_std` cross-checks green.
 12. README, `docs/API.md`, `docs/GENERATED-CODE.md`, and every document in section 13 complete and matching the build; no banned words; no U+2014; no emoji; no `.dev/` reference in public files.
 13. L2 derive passes the shared conformance suite against the 1.0 contract; L3 reads codes through the probe.
-14. At least page-db, Hive DB distro, hive-exec, kraken, noml-rust, and mod-cli run on the release candidate with green CI; config-lib's path is agreed with James.
+14. At least page-db, the internal consumer's two crates, kraken, noml-rust, and mod-cli run on the release candidate with green CI; config-lib's path is agreed with James.
 15. The release routine (section 15) completed for 1.0.0; docs.rs build green.
 
 ---
@@ -2150,7 +2150,7 @@ Each decision has a recommendation. The recommendation stands unless James overr
 | OD-1 | Crate name | (decided) | **Decided by James, 2026-10-22: `define-err`** (D-001). Checked free on crates.io and GitHub on 2026-10-22 before the repository was created. |
 | OD-2 | MSRV and edition | (a) 1.81 + edition 2021; (b) 1.85 + edition 2024 (portfolio default); (c) lower MSRV with the `Error` impl gated on `std` | **Decided (D-002): (a) 1.81 / 2021.** 1.81 is the first release where `core::error::Error` is stable (Rust blog, 2024-09-05), which `no_std` errors need. (c) is impossible for generated code: a `cfg(feature = "std")` in a macro expansion tests the user's features, not this crate's (7.5.6). Between (a) and (b): this crate caps the MSRV of every crate that depends on it, and kraken (1.80), mod-cli (1.81), noml-rust (1.82), and config-lib (1.75) are below 1.85; with (a) only kraken (+1) and config-lib (+6) must move. Inline `const` (1.79) and const `from_utf8` are within 1.81. Edition 2021 costs nothing here (no 2024-only feature is needed; `macro_rules!` fragments follow the defining crate's edition). |
 | OD-3 | The facade's `unsafe` | (a) one small `unsafe` slot module, the `log` crate's proven pattern, Miri and loom tested; (b) `forbid(unsafe_code)` with the facade available only with `std` (`OnceLock`); (c) no facade in L1 | **Decided (D-003): (a).** R1 requires `no_std`; stable Rust has no safe `no_std` once-cell that is `Sync`. (b) would make `no_std` libraries unable to report, which is the facade's purpose. Three `unsafe` sites in one file, under 40 lines, with a state machine identical in shape to `log`'s, are auditable in minutes. |
-| OD-4 | Code layout | (a) 7.6: 32-bit reversible namespace text, 3-bit width, 5 reserved, 24-bit number; (b) the error-suite plan, 4.1: 16-bit registered namespace id, 32-bit number, 16 reserved | **Accepted as recommended (D-018).** **(a).** A code must display and compare without a registry, in `no_std`, and identically on every node; registered ids need run-time registration that libraries cannot do and nodes must agree on. Costs: six-character namespaces (every namespace in use today fits: DB, DIS, EXE, CV, CFG, AUTH, GATEWAY needs to become GATEWY or GW) and 16.7 million numbers per namespace. |
+| OD-4 | Code layout | (a) 7.6: 32-bit reversible namespace text, 3-bit width, 5 reserved, 24-bit number; (b) the error-suite plan, 4.1: 16-bit registered namespace id, 32-bit number, 16 reserved | **Accepted as recommended (D-018).** **(a).** A code must display and compare without a registry, in `no_std`, and identically on every node; registered ids need run-time registration that libraries cannot do and nodes must agree on. Costs: six-character namespaces (every namespace in use today fits: DB, SVC, JOB, IO, CFG, AUTH, GATEWAY needs to become GATEWY or GW) and 16.7 million numbers per namespace. |
 | OD-5 | Identity probe through `Error::description` | (a) probe (7.11); (b) no probe: metadata only through typed `ErrorInfo`, so L3 cannot see codes of wrapped errors; (c) wait for `Error::provide` | **Accepted as recommended (D-018).** **(a).** It is the only stable mechanism that works through `dyn Error` chains and foreign wrappers; it costs nothing at run time until read. Its one visible effect (the deprecated `description()` returns the probe) affects no current caller. (c) is nightly-only and excluded by the error collection plan, 10.4; add it next to the probe if it stabilises. |
 | OD-6 | Split codes, levels, catalog, categories, and kinds into their own library later (the error-forge successor) | (a) keep in L1 for 1.0 with internal module boundaries enforced; (b) split now | **Accepted as recommended (D-018).** **(a).** Every user of codes also defines errors, and splitting a less-than-5k-line crate adds a second version to coordinate for every library. The module-boundary CI check (7.1) keeps a split mechanical. Split if any of: source passes 6,000 lines (NFR-14); a consumer needs codes without the macro or facade (for example a protocol crate parsing codes off the wire); codes need a major version independent of definitions. If split, the codes crate is the natural successor to error-forge's code features, and `error-forge` itself gets the deprecation notice of the error-suite plan, E-3 either way. |
 | OD-7 | Help text required with every code | yes (the error-suite plan, E-7); no | **Accepted as recommended (D-018).** **Yes.** A code without an explanation is the failure rustc's `--explain` exists to prevent; the cost is one string per code, written once. |
@@ -2226,8 +2226,8 @@ Each decision has a recommendation. The recommendation stands unless James overr
 | noml-rust 0.10.0 | 2.0 | 1.82 / 2021 | 44 | 0 | 4 | 0 | 0 | `NomlError` already `#[non_exhaustive]` |
 | kraken 0.9.3 (+ kraken-lsp) | 1.0 | 1.80 / 2021 | 10 | 1 | 0 | 4 | 1 | `"{}", .diagnostic.format()` |
 | mod-cli 0.6.4 | 1.0.56 | 1.81 / 2021 | 8 | 2 | 0 | 7 | 0 | `ModCliError` not `#[non_exhaustive]` |
-| Hive DB distro | 2 | 1.85 / 2024 | 2 | 0 | 1 | 0 | 0 | codes inside messages: `"DIS-00001: configuration error [{field}]..."` |
-| Hive DB hive-exec (+ colvec) | 2 | 1.85 / 2024 | 3 | 1 | 0 | 0 | 0 | codes inside messages: `EXE-00001`, `EXE-00002`, `CV-00001` |
+| internal consumer, crate A | 2 | 1.85 / 2024 | 2 | 0 | 1 | 0 | 0 | codes inside messages: `"SVC-00001: configuration error [{field}]..."` |
+| internal consumer, crate B (+ a data crate) | 2 | 1.85 / 2024 | 3 | 1 | 0 | 0 | 0 | codes inside messages: `JOB-00001`, `JOB-00002`, `IO-00001` |
 | cli-forge 0.1.0 | 1.0.56 | none / 2021 | 0 | 0 | 0 | 0 | 0 | dependency declared, never used: remove it |
 
 (Counts are lines matching the attribute in `.rs` files outside `target/`; they guide effort, they are not an audit.)
@@ -2235,7 +2235,7 @@ Each decision has a recommendation. The recommendation stands unless James overr
 ### 19.2 Two routes
 
 1. **L2 derive (near find-and-replace).** Replace `thiserror = "..."` with the L2 crate, and `use thiserror::Error` / `#[derive(thiserror::Error)]` with L2's path. `#[error("...")]`, `#[from]`, `#[source]`, `transparent`, `{0}`, and `.field` arguments keep working (EC-4). Then add metadata attributes where wanted. Best for config-lib (132 attributes) and any crate that wants the smallest diff.
-2. **`define_errors!` (no proc macro).** Rewrite each enum into the 7.4 form. Best for small error sets, `no_std` crates, and crates that want zero build dependencies (page-db, Hive DB, kraken, mod-cli, noml-rust). Mechanical rules below.
+2. **`define_errors!` (no proc macro).** Rewrite each enum into the 7.4 form. Best for small error sets, `no_std` crates, and crates that want zero build dependencies (page-db, the internal consumer, kraken, mod-cli, noml-rust). Mechanical rules below.
 
 Both routes produce the same code (7.5), so a crate may move from route 1 to route 2 later without any change visible to its users, except the three differences in 7.5.7.
 
@@ -2253,13 +2253,13 @@ Both routes produce the same code (7.5), so a crate may move from route 1 to rou
 | `#[source] cause: E` or a field named `source` | unchanged |
 | `#[non_exhaustive]` on the enum | keep it or delete it: the macro adds it when absent and never adds a second copy |
 | enum intentionally exhaustive and published | add `#[exhaustive]` so no breaking change is introduced |
-| code inside the message: `#[error("DIS-00001: configuration error [{field}]")]` | `namespace = "DIS", width = 5;` + `#[code(1, help = "...")]` + message without the prefix |
+| code inside the message: `#[error("SVC-00001: configuration error [{field}]")]` | `namespace = "SVC", width = 5;` + `#[code(1, help = "...")]` + message without the prefix |
 
 ### 19.4 Per project
 
 **page-db (1.85, 55 attributes).** Route 2 at the 0.3 pilot and for real at 0.8. Six `{0}` become named bindings. `PageError` keeps its `#[non_exhaustive]` (default). Extra named arguments use the parenthesised form. Add `namespace = "PAGE"` and codes for the persistent failures (checksum mismatch: `DataLoss`; buffer pool exhausted: `ResourceExhausted`; short read: `Unavailable`) once 0.4 lands; message text unchanged, so log searches keep working. MSRV unchanged.
 
-**Hive DB distro and hive-exec (1.85, 5 attributes).** Route 2. The codes already in the messages (`DIS-00001`, `DIS-00003`, `EXE-00001`, `EXE-00002`, `CV-00001`) move into `#[code]` with `width = 5`, so `err.code().to_string()` produces exactly the old prefix. **Behaviour change to agree on:** `Display` no longer starts with the code. Logs that need the prefix get it from L4 (`[DIS-00001] configuration error ...`) or from L7's record; until L4 exists, keeping the prefix inside the message text is allowed (the code is then in both places) and is removed when L4 lands. Categories: configuration errors `InvalidArgument` with `#[action(FixConfig)]`; I/O errors `Unavailable`; data errors `InvalidArgument` or `DataLoss` by meaning. Hive DB is enterprise-grade (portfolio rule), so every code gets real help text and a docs URL template from day one.
+**The internal consumer's two crates (1.85, 5 attributes).** Route 2. The codes already in the messages (`SVC-00001`, `SVC-00003`, `JOB-00001`, `JOB-00002`, `IO-00001`) move into `#[code]` with `width = 5`, so `err.code().to_string()` produces exactly the old prefix. **Behaviour change to agree on:** `Display` no longer starts with the code. Logs that need the prefix get it from L4 (`[SVC-00001] configuration error ...`) or from L7's record; until L4 exists, keeping the prefix inside the message text is allowed (the code is then in both places) and is removed when L4 lands. Categories: configuration errors `InvalidArgument` with `#[action(FixConfig)]`; I/O errors `Unavailable`; data errors `InvalidArgument` or `DataLoss` by meaning. It is enterprise-grade (portfolio rule), so every code gets real help text and a docs URL template from day one.
 
 **kraken (1.80 to 1.81, 10 attributes).** Route 2. MSRV raise of one minor version, before kraken's own 1.0, recorded in its changelog. Four `{0}` become named bindings; the `.diagnostic.format()` argument becomes the parenthesised form. kraken-lsp follows the same steps. Diagnostics with source spans move to L5 later, not as part of this migration.
 
@@ -2277,7 +2277,7 @@ lsm-db, txn-db, wal-db, better-bucket, rate-net, and throttle-net use error-forg
 
 ### 19.6 Order
 
-page-db (pilot at 0.3, final at 0.8) → Hive DB distro and hive-exec (0.8) → kraken (0.8) → mod-cli and noml-rust (0.9) → cli-forge cleanup (any time) → config-lib (per 19.4 decision) → error-forge users (their next majors).
+page-db (pilot at 0.3, final at 0.8) → the internal consumer (0.8) → kraken (0.8) → mod-cli and noml-rust (0.9) → cli-forge cleanup (any time) → config-lib (per 19.4 decision) → error-forge users (their next majors).
 
 ---
 
@@ -2304,7 +2304,7 @@ Every design decision, in order. A decision that changes a section above updates
 | D-015 | 2026-10-23 | `RecordLimits` has public fields with `DEFAULT`, `new()`, and `Default`, instead of `const fn` setters. | Changing one limit reads as one assignment; `#[non_exhaustive]` still lets limits be added in a minor release. |
 | D-016 | 2026-10-23 | `testing::capture` returns `Result<(R, Vec<CapturedEvent>), InstallError>` and does not run the closure when another reporter is installed, instead of returning a synthetic error event. | A synthetic event could make `assert_eq!(events.len(), 1)` pass for the wrong reason; failing closed is the only safe answer for a test helper. |
 | D-017 | 2026-10-23 | `CodeParseError` gains `TooLong` (more than 15 bytes, checked first) and `BadWidth`; no error type here echoes rejected input in its `Display`. | The length check runs before any other work (standard 2.4); a hostile string must not reach logs through the parser's own error (T4, the 0.2 defence idea in 10.2). |
-| D-018 | 2026-10-23 | OD-4 to OD-18 and OD-20 to OD-22 accepted as recommended. | Each is a technical call with a recorded reason in section 17; none is a product, visibility, or irreversible decision. The behaviour change for Hive DB (`Display` no longer starts with the code, 19.4) is agreed at its migration in 0.8. |
+| D-018 | 2026-10-23 | OD-4 to OD-18 and OD-20 to OD-22 accepted as recommended. | Each is a technical call with a recorded reason in section 17; none is a product, visibility, or irreversible decision. The behaviour change for the internal consumer (`Display` no longer starts with the code, 19.4) is agreed at its migration in 0.8. |
 | D-019 | 2026-10-23 | report-err X-12: the items report-err names (X-1 to X-10, with the answers above) are stable from `0.2.0`: changed only with a decision-log entry here and a note to the report-err owner before release. The probe format is frozen at 1.0. | report-err builds against this API in parallel and must not chase a moving target. |
 | D-020 | 2026-10-23 | Code text alphabet for the base-37 namespace: `'0'`-`'9'` are 1 to 10, `'A'`-`'Z'` are 11 to 36, 0 pads after the last character. Golden values in `tests/golden/codes.txt`. | Digits below letters keeps numeric order equal to ASCII order of the text, which 7.6 promises and E-53 tests. The specification fixed the base but not the digit values. |
 | D-021 | 2026-10-23 | `CodeInfo` is built with `CodeInfo::new(code, title, help)` and `const` `with_*` methods, used by generated code and by hand-written catalogs. | The struct is `#[non_exhaustive]` (fields can be added), so it cannot be built with a literal outside this crate; `const` builders keep catalogs static data. |
@@ -2319,7 +2319,7 @@ Every design decision, in order. A decision that changes a section above updates
 | D-030 | 2026-10-29 | Dev-dependencies (thiserror 2, trybuild 1, criterion 0.5) are resolved for the MSRV by a current Cargo with `CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback`, then built with 1.81; the compile-fail tests run in their own CI job pinned to 1.99, skipped elsewhere unless `DEFINE_ERR_UI=1`. | Latest trybuild needs Rust 1.88; the fallback resolver picks the newest versions that honour `rust-version = "1.81"`. Compiler messages differ between releases, so the expected output is pinned and refreshed deliberately (12.2). Runtime dependencies stay at zero. |
 | D-031 | 2026-10-29 | page-db pilot (0.3 exit): page-db's `src/error.rs` (ten variants, one `{0}`, extra named arguments, hex format specs, multi-line messages) was rewritten with `define_errors!` in a scratch copy, with no other change than the dependency. All 65 page-db tests and doctests passed, clippy with `-D warnings` and rustdoc were clean, on page-db's edition 2024 and Rust 1.99. Findings: the conversion is mechanical (`{0}` becomes a named binding; `#[non_exhaustive]` may be deleted); no change to define-err was needed. The page-db repository was not modified; the real migration is 0.8. | The exit criterion asks for the pilot before metadata lands. |
 | D-032 | 2026-10-29 | 0.3 benchmark (criterion, Windows 11, AMD Ryzen 9 9950X3D, Rust 1.99, other build sessions running on the machine): `Display` of a two-field tuple variant 22.5 ns (define-err), 22.3 ns (thiserror), 23.4 ns (hand-written); construction plus `source()` 0.33 ns for all three. The differences are inside the noise; identical, as 11.1 requires. `size_of` equality with thiserror and hand-written enums is a test. | 0.3 exit criterion; the full benchmark suite and `docs/PERFORMANCE.md` are 0.6. |
-| D-033 | 2026-10-29 | The identity probe carries the code's full value (`Code::as_u64`, width included), not its identity. `tests/golden/probe.txt` was regenerated before any release carried probes. | A probe that dropped the width made `identify(err).code.to_string()` print `DIS-0001` for a code defined as `DIS-00001`; the width costs nothing to carry, and `Code` equality ignores it anyway. |
+| D-033 | 2026-10-29 | The identity probe carries the code's full value (`Code::as_u64`, width included), not its identity. `tests/golden/probe.txt` was regenerated before any release carried probes. | A probe that dropped the width made `identify(err).code.to_string()` print `SVC-0001` for a code defined as `SVC-00001`; the width costs nothing to carry, and `Code` equality ignores it anyway. |
 | D-034 | 2026-10-29 | A `transparent` variant forwards every `ErrorInfo` method to its inner value when the inner type implements `ErrorInfo`, and otherwise answers with its own metadata attributes, or the defaults. The probe follows the same rule (`forward_probe`). | A wrapper around a foreign error (`std::fmt::Error`, a dependency's type) still needs a code and a category; the trait default would throw away what the variant says. |
 | D-035 | 2026-10-29 | Each mistake is reported once. The namespace and every code number are checked in the block's one `const _` item (`__private::namespace`, `__private::code`); every other place reads them through `namespace_or_placeholder` and `code_or_placeholder`, which never fail. A malformed `#[code(...)]` is reported by one `__define_err_code!(@check ...)` item per variant; the other readers fall back to placeholders. | The first build reported one code mistake four to nine times, once per generated method. Placeholders never reach a user: the error that causes them stops the build. |
 | D-036 | 2026-10-29 | `Severity::at::<N>()` and `Kinds::project::<N>()` check their argument with an inline `const` block. Generated code uses both in `const` items, where `cargo check` rejects a bad value; in a function body the check runs when the function is built. The UI cases use `const` items. | Inline `const` blocks are evaluated at monomorphization, which `cargo check` does not always reach. A `const` item is the one form checked under every command, and it is what the macro emits. |
@@ -2359,3 +2359,4 @@ Every design decision, in order. A decision that changes a section above updates
 | D-070 | 2026-11-04 | A crate past 1.0 that migrates takes define-err as a public dependency: every generated type implements `define_err::ErrorInfo` (G5), and a later define-err minor is a different trait. `cargo semver-checks` does not see this. Policy: such a crate states in its changelog that the `ErrorInfo` impl follows define-err's version until define-err 1.0; at 1.0, the last 0.x minor is republished as a patch that depends on 1.0 and re-exports the items generated code implements (`ErrorInfo`, `Code`, `Severity`, `Category`, `Kinds`, `Action`, `CodeInfo`; `Location` is core's type already), so a crate on 0.x and one on 1.0 share one trait. `docs/MIGRATION.md` says so. Not generating `ErrorInfo` for such crates was considered and rejected: the probe and every L3+ reader depend on it. |
 | D-071 | 2026-11-04 | Findings from the first migrations that change nothing in the crate, recorded so they are not found again. A type with its own inherent `code()` keeps it: an inherent method wins method resolution over `ErrorInfo::code`, so `err.code()` still returns the crate's own number and `ErrorInfo::code(&err)` the `Code`; `docs/MIGRATION.md` says so. A crate whose codes are written into its messages keeps them there for byte-identical `Display` and states them again as `#[code]`; a test per type that the two agree is the crate's choice. Every `#[code]` needs `help`, which a migration has to write: kept, because a code without its explanation is the gap the catalog closes. The thiserror dependency the plan listed for one CLI crate was already gone upstream. |
 | D-072 | 2026-11-04 | `#[cfg]` on a whole type covers its impls: they go into one `const _: () = { ... };` carrying only the type's `cfg` attributes, copied from the input (rule 2 still holds: no `cfg` of define-err's own). Found by this release's own path test, which put `#[cfg(feature = "std")]` on an enum: the type went and its impls stayed. A type with no `cfg` expands exactly as before. Known limit, kept: the codes of a compiled-out type still count in its block's duplicate check, which errs towards a false duplicate between two alternative definitions, never a missed one; give alternatives their own blocks. |
+| D-073 | 2026-11-04 | Examples, docs, tests, and golden files name no real product or company. James's call: a private consumer's names stay out of a public repository, and its findings are described generically ("an internal consumer"). The examples use `ServiceError`, namespaces `SVC`, `JOB`, and `IO`, and `docs.example.com`; the golden code rows were recomputed with the same packing, and the formats are unchanged. Already-published releases and the git history keep the old text. |

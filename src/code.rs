@@ -102,13 +102,13 @@ const fn valid_field(field: u32) -> bool {
 /// use define_err::{namespace, Namespace};
 ///
 /// const DB: Namespace = namespace!("DB");
-/// const DIS: Namespace = namespace!("DIS", width = 5);
+/// const SVC: Namespace = namespace!("SVC", width = 5);
 ///
 /// assert_eq!(&*DB.as_str(), "DB");
-/// assert_eq!(DIS.width(), 5);
+/// assert_eq!(SVC.width(), 5);
 /// assert_eq!(Namespace::try_new("db").unwrap(), DB);
 /// assert!(Namespace::try_new("1DB").is_err());
-/// assert_eq!(DIS.code(1).unwrap().to_string(), "DIS-00001");
+/// assert_eq!(SVC.code(1).unwrap().to_string(), "SVC-00001");
 /// ```
 #[derive(Clone, Copy)]
 pub struct Namespace {
@@ -153,9 +153,9 @@ impl Namespace {
     /// ```
     /// use define_err::Namespace;
     ///
-    /// let dis = Namespace::try_with_width("DIS", 5).unwrap();
-    /// assert_eq!(dis.width(), 5);
-    /// assert!(Namespace::try_with_width("DIS", 9).is_err());
+    /// let svc = Namespace::try_with_width("SVC", 5).unwrap();
+    /// assert_eq!(svc.width(), 5);
+    /// assert!(Namespace::try_with_width("SVC", 9).is_err());
     /// ```
     pub const fn try_with_width(text: &str, width: u8) -> Result<Namespace, CodeParseError> {
         if width == 0 || width > 8 {
@@ -633,7 +633,7 @@ impl core::error::Error for CodeParseError {}
 
 /// A namespace constant, checked at compile time.
 ///
-/// `namespace!("DB")` has width 4; `namespace!("DIS", width = 5)` sets it. An
+/// `namespace!("DB")` has width 4; `namespace!("SVC", width = 5)` sets it. An
 /// invalid literal does not compile.
 ///
 /// # Examples
@@ -641,8 +641,8 @@ impl core::error::Error for CodeParseError {}
 /// ```
 /// use define_err::{namespace, Namespace};
 ///
-/// const DIS: Namespace = namespace!("DIS", width = 5);
-/// assert_eq!(DIS.code(1).unwrap().to_string(), "DIS-00001");
+/// const SVC: Namespace = namespace!("SVC", width = 5);
+/// assert_eq!(SVC.code(1).unwrap().to_string(), "SVC-00001");
 /// ```
 #[macro_export]
 macro_rules! namespace {
@@ -658,7 +658,7 @@ macro_rules! namespace {
 
 /// A code constant, checked at compile time.
 ///
-/// `code!("DB", 42)` uses a namespace literal with width 4; `code!(DIS, 1)`
+/// `code!("DB", 42)` uses a namespace literal with width 4; `code!(SVC, 1)`
 /// uses a `Namespace` constant. An invalid namespace or number does not
 /// compile.
 ///
@@ -667,11 +667,11 @@ macro_rules! namespace {
 /// ```
 /// use define_err::{code, namespace, Code, Namespace};
 ///
-/// const DIS: Namespace = namespace!("DIS", width = 5);
-/// const CONFIG: Code = code!(DIS, 1);
+/// const SVC: Namespace = namespace!("SVC", width = 5);
+/// const CONFIG: Code = code!(SVC, 1);
 /// const TIMEOUT: Code = code!("DB", 1);
 ///
-/// assert_eq!(CONFIG.to_string(), "DIS-00001");
+/// assert_eq!(CONFIG.to_string(), "SVC-00001");
 /// assert_eq!(TIMEOUT.to_string(), "DB-0001");
 /// ```
 #[macro_export]
@@ -701,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_namespace_text_round_trip_and_uppercase() {
-        for text in ["A", "DB", "DIS", "AUTH", "GW", "Z9", "ZZZZZZ", "A00000"] {
+        for text in ["A", "DB", "SVC", "AUTH", "GW", "Z9", "ZZZZZZ", "A00000"] {
             assert_eq!(&*ns(text).as_str(), text);
         }
         assert_eq!(&*ns("db").as_str(), "DB");
@@ -745,8 +745,8 @@ mod tests {
     fn test_code_display_width_and_wide_numbers() {
         assert_eq!(ns("DB").code(42).unwrap().to_string(), "DB-0042");
         assert_eq!(ns("DB").code(123_456).unwrap().to_string(), "DB-123456");
-        let dis = Namespace::try_with_width("DIS", 5).unwrap();
-        assert_eq!(dis.code(1).unwrap().to_string(), "DIS-00001");
+        let svc = Namespace::try_with_width("SVC", 5).unwrap();
+        assert_eq!(svc.code(1).unwrap().to_string(), "SVC-00001");
         assert_eq!(format!("{:?}", ns("DB").code(42).unwrap()), "Code(DB-0042)");
     }
 
@@ -820,8 +820,8 @@ mod tests {
             h.finish()
         };
         assert_eq!(
-            hash(Code::parse("DIS-0001").unwrap()),
-            hash(Code::parse("DIS-00001").unwrap())
+            hash(Code::parse("SVC-0001").unwrap()),
+            hash(Code::parse("SVC-00001").unwrap())
         );
     }
 

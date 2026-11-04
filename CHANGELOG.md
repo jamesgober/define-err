@@ -30,6 +30,12 @@
 - A `#[code]` without `help`, or with its fields out of order, reports that
   one error. Two of them in a block also reported a false duplicate code.
 
+### Changed
+
+- Examples, docs, and test data use neutral names (`ServiceError`,
+  namespaces `SVC`, `JOB`, and `IO`, `docs.example.com`). No behaviour or
+  format changes.
+
 ### Generated code
 
 - A plain message's `Display` arm rebinds each field through
@@ -230,7 +236,7 @@ Codes and metadata.
 ### Changed
 
 - The probe carries the code's full value, width included, so an
-  identified code displays as it was defined (`DIS-00001`);
+  identified code displays as it was defined (`SVC-00001`);
   `tests/golden/probe.txt` updated before any release carried probes.
 - `docs/API.md`: the `#[code]` argument order, the deprecated note, the
   `io::ErrorKind` mapping, the transparent fallback, and when a numeric

@@ -99,7 +99,7 @@
 ///
 /// define_errors! {
 ///     namespace = "DB";
-///     docs = "https://docs.hivedb.com/errors/{code}";
+///     docs = "https://docs.example.com/errors/{code}";
 ///
 ///     pub enum DbError {
 ///         #[code(1, name = TIMEOUT, help = "Raise pool.size or lower the load.")]

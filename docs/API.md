@@ -394,7 +394,7 @@ retired = [<n>, ...];
 #[code(<n> [, name = <IDENT>], help = "<text>" [, title = "<text>"] [, deprecated = "<since>" [, replacement = <n>]])]
 ```
 
-- `namespace`: 1 to 6 characters, `A` to `Z` and `0` to `9`, starting with a letter; lowercase is accepted and stored uppercase. `width` is the number of digits shown (default 4): `width = 5` displays `DIS-00001`. Width is presentation only: `DIS-1` and `DIS-00001` are the same code.
+- `namespace`: 1 to 6 characters, `A` to `Z` and `0` to `9`, starting with a letter; lowercase is accepted and stored uppercase. `width` is the number of digits shown (default 4): `width = 5` displays `SVC-00001`. Width is presentation only: `SVC-1` and `SVC-00001` are the same code.
 - `#[code(n, help = "...")]`: `n` is an integer literal from 0 to 16,777,215 (`1_000` and `0x2A` are accepted and display in decimal). Number 0 is the namespace's generic code. `help` is required: every code ships with what to do about it.
 - `name = TIMEOUT` adds the associated constant `DbError::TIMEOUT: Code`. Without it the code is reached through `err.code()` or the catalog.
 - `title` is the catalog title; it defaults to the variant name.
@@ -411,7 +411,7 @@ use define_err::prelude::*;
 
 define_errors! {
     namespace = "DB";
-    docs = "https://docs.hivedb.com/errors/{code}";
+    docs = "https://docs.example.com/errors/{code}";
     retired = [9, 12];
 
     pub enum DbError {
@@ -439,22 +439,22 @@ assert_eq!(err.help(), Some("Raise pool.size or lower the load."));
 assert_eq!(DbError::CATALOG.len(), 6);              // four codes plus two retired numbers
 ```
 
-Five-digit codes, as Hive DB uses them:
+Five-digit codes:
 
 ```rust
 define_errors! {
-    namespace = "DIS", width = 5;
+    namespace = "SVC", width = 5;
 
-    pub enum DistroError {
-        #[code(1, help = "Fix the named field in distro.noml.")]
+    pub enum ServiceError {
+        #[code(1, help = "Fix the named field in service.noml.")]
         #[category(InvalidArgument)]
         #[action(FixConfig)]
         Config { field: String, reason: String } => "configuration error [{field}]: {reason}",
     }
 }
 
-let err = DistroError::Config { field: "port".into(), reason: "not a number".into() };
-assert_eq!(err.code().unwrap().to_string(), "DIS-00001");
+let err = ServiceError::Config { field: "port".into(), reason: "not a number".into() };
+assert_eq!(err.code().unwrap().to_string(), "SVC-00001");
 ```
 
 ### Metadata attributes
@@ -764,13 +764,13 @@ Equality, ordering, and hashing compare the text only; the width is presentation
 use define_err::{namespace, Namespace};
 
 const DB: Namespace = namespace!("DB");
-const DIS: Namespace = namespace!("DIS", width = 5);
+const SVC: Namespace = namespace!("SVC", width = 5);
 
 assert_eq!(&*DB.as_str(), "DB");
-assert_eq!(DIS.width(), 5);
+assert_eq!(SVC.width(), 5);
 assert_eq!(Namespace::try_new("db").unwrap(), DB);
 assert!(Namespace::try_new("1DB").is_err());
-assert_eq!(DIS.code(1).unwrap().to_string(), "DIS-00001");
+assert_eq!(SVC.code(1).unwrap().to_string(), "SVC-00001");
 ```
 
 ### `Code` and `code!`
@@ -1264,7 +1264,7 @@ Writes the docs template with every `{code}` replaced by the code's text (`DB-00
 
 ```rust
 let info = DbError::Timeout { after_ms: 1 }.code_info().unwrap();
-assert_eq!(info.url().unwrap().to_string(), "https://docs.hivedb.com/errors/DB-0001");
+assert_eq!(info.url().unwrap().to_string(), "https://docs.example.com/errors/DB-0001");
 ```
 
 ### `catalog::find` and `catalog::check_unique`
@@ -1357,7 +1357,7 @@ pub struct Identity<'a> {
 }
 ```
 
-`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message, and `public` is that text (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`DIS-00001`, not `DIS-0001`).
+`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message, and `public` is that text (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`SVC-00001`, not `SVC-0001`).
 
 ## `Secret<T>`
 
