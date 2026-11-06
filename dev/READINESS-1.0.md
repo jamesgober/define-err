@@ -17,8 +17,8 @@
 | 1. P0 to P2 items implemented, documented, tested | Done at 0.5; re-checked in the 0.9 audit. |
 | 2. Every FR and NFR has a named test (`tests/TRACEABILITY.md`) | Done in 0.9: every requirement is mapped. NFR-2, NFR-4, and NFR-5 are checked by measurement and NFR-13 by review, not by CI. |
 | 3. E-1 to E-100 pass | Done; the 0.9 edge-case review re-runs them and the cases added since. |
-| 4. T1 to T17 attack tests, costs stated | Done at 0.7; re-run in the 0.9 security review. |
-| 5. Fuzz, 24 hours per target, no open finding | Done at 0.7 (D-066); re-run for code changed since. |
+| 4. T1 to T17 attack tests, costs stated | Done at 0.7; they pass on every push. The 0.9 review of the run-time code changed since 0.7 (`short_file`, path display, the code checks) found D-081, fixed. |
+| 5. Fuzz, 24 hours per target, no open finding | Done at 0.7 (D-066). The one new run-time parser since, `short_file`, has a property test (`prop_short_file_is_a_suffix_and_keeps_relative_paths`) in place of a fuzz target. |
 | 6. loom, Miri, 8-hour soak | Done at 0.7; Miri also passes over 0.8. |
 | 7. Counting-allocator proofs | Done. |
 | 8. `docs/PERFORMANCE.md`; build and facade 20% faster or a reviewed reason | Partly: the misses below are reviewed (D-060) and open for the 0.9 tuning pass. |
@@ -45,4 +45,4 @@
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,230 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,232 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

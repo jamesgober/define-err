@@ -566,10 +566,10 @@ impl $crate::ErrorInfo for DbError {
 // After the block's last type: the block's checks, once.
 const _: () = {
     let namespace = $crate::__private::namespace("DB", 4);
-    let _ = $crate::__private::code(namespace, 1);
-    let _ = $crate::__private::code(namespace, 2);
-    let _ = $crate::__private::code(namespace, 3);
-    let _ = $crate::__private::code(namespace, 10);
+    $crate::__private::check_number(namespace, 1);
+    $crate::__private::check_number(namespace, 2);
+    $crate::__private::check_number(namespace, 3);
+    $crate::__private::check_number(namespace, 10);
     $crate::__private::check_block(
         "define_errors!: duplicate code number in namespace DB",
         &[1, 2, 3, 10],
@@ -757,8 +757,8 @@ Rules the macro itself rejects with `compile_error!` (each names the fix, and ea
 | `retired_code` | `const fn retired_code(namespace: Namespace, number: u32) -> CodeInfo` | a retired catalog entry | 0.4 |
 | `severity` | `const fn severity<const N: u8>() -> Severity` | a numeric severity, checked at compile time | 0.4 |
 | `check_block` | `const fn check_block(duplicate_message: &str, numbers: &[u32], retired: &[u32], replacements: &[&[(u32, u32)]])` | duplicates and replacements; panics in const evaluation; from `0.8` skips `INVALID_NUMBER` | 0.4 |
-| `check_number` | `const fn check_number(namespace: Namespace, number: u32)` | one number's range check in the block's check, skipping `INVALID_NUMBER` | 0.8 |
-| `INVALID_NUMBER` | `const INVALID_NUMBER: u32 = u32::MAX` | stands in for a `#[code]` with no number literal, whose own error is already reported; a `#[code]` with a literal but another fault keeps its literal | 0.8 |
+| `check_number` | `const fn check_number(namespace: Namespace, number: u32)` | one number's range check in the block's check, called only for a `#[code]` whose number is a literal; from `0.9` it skips nothing, so a literal equal to `INVALID_NUMBER` fails the range check | 0.8 |
+| `INVALID_NUMBER` | `const INVALID_NUMBER: u32 = u32::MAX` | stands in for a `#[code]` with no number literal, whose own error is already reported, in `check_block` and the `match`; a `#[code]` with a literal but another fault keeps its literal | 0.8 |
 | `catalog_len`, `catalog` | `const fn catalog_len(parts: &[&[CodeInfo]]) -> usize`; `const fn catalog<const N: usize>(parts: &[&[CodeInfo]]) -> [CodeInfo; N]` | build a type's `CATALOG` from per-variant parts | 0.4 |
 | `check_docs` | `const fn check_docs(template: &str)` | the docs template has a placeholder | 0.4 |
 | `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong or non-ASCII name or an overlong public message | 0.5 |

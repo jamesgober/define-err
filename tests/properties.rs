@@ -1,7 +1,7 @@
 //! Property tests (dev/PLAN.md 12.3): round trips, orderings, set laws, and
 //! "never panics" for every parser and decoder.
 
-use define_err::{identify, Category, Code, Kinds, Namespace, Secret, Severity};
+use define_err::{identify, short_file, Category, Code, Kinds, Namespace, Secret, Severity};
 #[cfg(feature = "alloc")]
 use define_err::{ErrorRecord, RecordLimits};
 use proptest::prelude::*;
@@ -94,6 +94,17 @@ proptest! {
     #[test]
     fn prop_category_parse_never_panics(text in ".{0,40}") {
         let _ = Category::parse(&text);
+    }
+
+    #[test]
+    fn prop_short_file_is_a_suffix_and_keeps_relative_paths(text in r"([a-zé/\\:.]|src){0,40}") {
+        let short = short_file(&text);
+        prop_assert!(text.ends_with(short), "{text:?} -> {short:?}");
+        let absolute = text.starts_with(['/', '\\'])
+            || matches!(text.as_bytes(), [d, b':', s, ..] if d.is_ascii_alphabetic() && (*s == b'/' || *s == b'\\'));
+        if !absolute {
+            prop_assert_eq!(short, text.as_str());
+        }
     }
 
     #[test]

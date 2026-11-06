@@ -18,6 +18,11 @@
   to be reported seven times, once by each value that reads it.
 - A variant with two `#[from]` fields is reported once, as a variant with more
   than one source field.
+- `#[code(4294967295, help = "...")]` is rejected as out of range. 0.8.0
+  took that number for the stand-in of a code with no number literal, so it
+  skipped the range check and the code read as a placeholder. `__private`:
+  `check_number` no longer skips `INVALID_NUMBER`; the block calls it only for
+  a code whose number is a literal.
 
 ### Added
 

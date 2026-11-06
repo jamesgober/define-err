@@ -416,6 +416,9 @@ macro_rules! __define_err_ns {
 macro_rules! __define_err_code {
     // Operations on a parsed code: [n] [name] [help] [title] [since] [replacement].
     (@do check [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {};
+    (@do range [$namespace:ident] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
+        $crate::__private::check_number($namespace, $n)
+    };
     (@do number [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
         $n
     };
@@ -513,6 +516,7 @@ macro_rules! __define_err_code {
     // literal, the block's checks still see that number, so a real duplicate
     // is caught and nothing else is reported; without one they skip it.
     (@invalid check [$($n:literal)?] [$($message:tt)*]) => { ::core::compile_error! { $($message)* } };
+    (@invalid range [$($args:tt)*] [$($message:tt)*]) => {};
     (@invalid number [$n:literal] [$($message:tt)*]) => { $n };
     (@invalid number [] [$($message:tt)*]) => { $crate::__private::INVALID_NUMBER };
     (@invalid replacement [$($n:literal)?] [$($message:tt)*]) => { &[] };
