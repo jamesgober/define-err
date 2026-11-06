@@ -83,6 +83,9 @@ log = "0.4"
 error-forge = "1"
 # Property tests of every invariant (round trips, set laws, "never panics").
 proptest = { version = "1", default-features = false, features = ["std"] }
+# Types defined in a second crate, where `#[non_exhaustive]` binds (FR-6).
+# A path dependency with no version: removed from the published manifest.
+define-err-fixture = { path = "tests/fixture" }
 
 
 # Exhaustive models of the facade's atomics (tests/loom.rs), built only with

@@ -197,7 +197,7 @@ macro_rules! __define_err_block {
             // The namespace and every code number are checked here, once;
             // everywhere else they fall back to placeholders.
             let namespace = $crate::__private::namespace($ns, $crate::__define_err_code!(@width $($w)?));
-            $( $($c)* $crate::__private::check_number(namespace, $crate::__define_err_code!(@number $code)); )*
+            $( $($c)* $crate::__define_err_code!(@parse range [namespace] $code); )*
             $crate::__private::check_block(
                 ::core::concat!("define_errors!: duplicate code number in namespace ", $ns),
                 &[ $( $($c)* $crate::__define_err_code!(@number $code) ),* ],

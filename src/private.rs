@@ -366,18 +366,16 @@ pub const fn severity<const N: u8>() -> crate::Severity {
 }
 
 /// The number a `#[code]` without a number literal stands in with. Its own
-/// `compile_error!` already reports it, so the block's checks skip it. No
-/// valid code reaches it (numbers are 24 bits).
+/// `compile_error!` already reports it, so the duplicate check skips it. A
+/// literal of the same value is out of range and fails `check_number`, which
+/// the block calls only for a code that parsed.
 #[doc(hidden)]
 pub const INVALID_NUMBER: u32 = u32::MAX;
 
-/// The range check of one code number, skipping the stand-in above. Const
-/// evaluation only.
+/// The range check of one code number. Const evaluation only.
 #[doc(hidden)]
 pub const fn check_number(namespace: crate::Namespace, number: u32) {
-    if number != INVALID_NUMBER {
-        let _ = code(namespace, number);
-    }
+    let _ = code(namespace, number);
 }
 
 /// The block's checks: no number twice (retired numbers included), and every
