@@ -11,6 +11,23 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- A malformed `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`,
+  `#[action]`, or `#[retryable]` is reported once. A malformed category used
+  to be reported seven times, once by each value that reads it.
+- A variant with two `#[from]` fields is reported once, as a variant with more
+  than one source field.
+
+### Added
+
+- `tools/invariants.py`, run by CI: no runtime dependency in any feature mode,
+  `unsafe` only in `src/facade/slot.rs` with a `SAFETY:` comment on every
+  line, the codes modules independent of the facade, a compile-fail case for
+  every message of `define_errors!`, and the size of `src`.
+- 23 compile-fail cases, one for each message that had none, and one showing
+  that a generated enum is `#[non_exhaustive]` in the crates that use it.
+
 ---
 
 ## [0.8.0] - 2026-11-05

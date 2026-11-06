@@ -1,0 +1,33 @@
+error[E0004]: non-exhaustive patterns: `_` not covered
+ --> tests/ui/non_exhaustive_downstream.rs:6:11
+  |
+6 |     match error {
+  |           ^^^^^ pattern `_` not covered
+  |
+note: `Open` defined here
+ --> src/macros/emit.rs
+  |
+  | /         $vis enum $name { $(
+  | |             $($vcfg)*
+  | |             $($vattr)*
+  | |             $vn $($body)?,
+  | |         )* }
+  | |____________^
+  |
+ ::: tests/fixture/src/lib.rs
+  |
+  | / define_errors! {
+  | |     /// An enum with the default: `#[non_exhaustive]` is added.
+  | |     pub enum Open {
+  | |         A => "a",
+... |
+  | | }
+  | |_- in this macro invocation
+  = note: the matched value is of type `Open`
+  = note: `Open` is marked as non-exhaustive, so a wildcard `_` is necessary to match exhaustively
+  = note: this error originates in the macro `$crate::__define_err_emit` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+  |
+8 ~         define_err_fixture::Open::B => {},
+9 +         _ => todo!()
+  |

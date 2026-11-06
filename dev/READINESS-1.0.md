@@ -15,7 +15,7 @@
 | Line (`PLAN.md` 16) | State |
 |---|---|
 | 1. P0 to P2 items implemented, documented, tested | Done at 0.5; re-checked in the 0.9 audit. |
-| 2. Every FR and NFR has a named test (`tests/TRACEABILITY.md`) | Open: the traceability map is a 0.9 deliverable. |
+| 2. Every FR and NFR has a named test (`tests/TRACEABILITY.md`) | Done in 0.9: every requirement is mapped. NFR-2, NFR-4, and NFR-5 are checked by measurement and NFR-13 by review, not by CI. |
 | 3. E-1 to E-100 pass | Done; the 0.9 edge-case review re-runs them and the cases added since. |
 | 4. T1 to T17 attack tests, costs stated | Done at 0.7; re-run in the 0.9 security review. |
 | 5. Fuzz, 24 hours per target, no open finding | Done at 0.7 (D-066); re-run for code changed since. |
@@ -23,7 +23,7 @@
 | 7. Counting-allocator proofs | Done. |
 | 8. `docs/PERFORMANCE.md`; build and facade 20% faster or a reviewed reason | Partly: the misses below are reviewed (D-060) and open for the 0.9 tuning pass. |
 | 9. Zero runtime dependencies; deny and audit clean | Done; checked by CI on every push. |
-| 10. `unsafe` only in `src/facade/slot.rs` | Done. |
+| 10. `unsafe` only in `src/facade/slot.rs` | Done; five lines, checked by `tools/invariants.py` (D-080). |
 | 11. CI green, every platform and mode | Done for every release so far. |
 | 12. Documents complete, no banned words | Re-checked in the 0.9 audit. |
 | 13. L2 passes the shared conformance suite; L3 reads codes through the probe | Open: waits on L2 and L3 (ROADMAP 0.9). |
@@ -45,3 +45,4 @@
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
+| Source size: 5,201 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

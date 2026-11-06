@@ -308,6 +308,23 @@ fn test_non_exhaustive_added_by_default() {
 }
 
 #[test]
+fn test_non_exhaustive_binds_downstream_and_exhaustive_opts_out() {
+    // From a second crate: the default enum needs a wildcard arm (the
+    // compile-fail case `tests/ui/non_exhaustive_downstream.rs` shows the
+    // error without one); an `#[exhaustive]` enum matches without one.
+    let open = match define_err_fixture::Open::B {
+        define_err_fixture::Open::A => "a",
+        define_err_fixture::Open::B => "b",
+        _ => "new",
+    };
+    let closed = match define_err_fixture::Closed::B {
+        define_err_fixture::Closed::A => "a",
+        define_err_fixture::Closed::B => "b",
+    };
+    assert_eq!((open, closed), ("b", "b"));
+}
+
+#[test]
 fn test_macro_inside_function_body() {
     define_errors! {
         enum Local {

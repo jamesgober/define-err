@@ -199,3 +199,5 @@ jobs:
         run: cargo audit
       - name: Deny
         run: cargo deny check
+      - name: Invariants (no runtime dependency, unsafe, module boundary, compile-fail coverage, size)
+        run: python3 tools/invariants.py
