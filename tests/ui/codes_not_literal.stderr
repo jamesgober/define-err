@@ -1,0 +1,12 @@
+error: define_errors!: a code number must be an integer literal from 0 to 16777215, for example `#[code(42, help = "...")]`
+  --> tests/ui/codes_not_literal.rs:6:1
+   |
+ 6 | / define_errors! {
+ 7 | |     namespace = "DB";
+ 8 | |     pub enum E {
+ 9 | |         #[code(N, help = "a")]
+...  |
+14 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `$crate::__define_err_code` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

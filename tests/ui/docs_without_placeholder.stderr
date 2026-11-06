@@ -3,7 +3,7 @@ error[E0080]: evaluation panicked: define_errors!: the docs template needs {code
    |
  3 | / define_errors! {
  4 | |     namespace = "DB";
- 5 | |     docs = "https://docs.hivedb.com/errors";
+ 5 | |     docs = "https://docs.example.com/errors";
  6 | |     pub enum E {
 ...  |
 10 | | }

@@ -155,6 +155,22 @@ impl TrailEntry {
             step,
         }
     }
+
+    /// The file as a log should show it: [`short_file`](crate::short_file)
+    /// of `file`. The record keeps the whole path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use define_err::{TrailEntry, TrailStep};
+    ///
+    /// let entry = TrailEntry::new(define_err::here(), TrailStep::Created);
+    /// assert!(!entry.short_file().starts_with('/'));
+    /// ```
+    #[must_use]
+    pub fn short_file(&self) -> &str {
+        crate::short_file(&self.file)
+    }
 }
 
 /// An owned, `Send + Sync + Clone` snapshot of an error, for anything that

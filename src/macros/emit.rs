@@ -40,13 +40,15 @@ macro_rules! __define_err_emit {
 
         $( $crate::__define_err_code!(@check $ns [$($code)?]); )*
 
-        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
-            ( $vcfg [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
-              $(( $( { $xrole $xname : $xty } )* ))?
-              => $msg )
-        )* ] }
+        $crate::__define_err_cfg! { [$($tattr)*] [] {
+            $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
+                ( $vcfg [Self::$vn] [::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn))] [::core::stringify!($vn)]
+                  [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
+                  $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
+                  $(( $( { $xrole $xname : $xty } )* ))?
+                  => $msg )
+            )* ] }
+        } }
 
         $crate::__define_err_block! {
             @types [$ns $docs $rall [] [$($acc)* $( $( { $vcfg $code } )? )*]] $($rest)*
@@ -67,13 +69,15 @@ macro_rules! __define_err_emit {
 
         $crate::__define_err_code!(@check $ns [$($code)?]);
 
-        $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
-            ( [] [Self] [::core::stringify!($name)] [::core::stringify!($name)]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
-              $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
-              $(( $( { $xrole $xname : $xty } )* ))?
-              => $msg )
-        ] }
+        $crate::__define_err_cfg! { [$($tattr)*] [] {
+            $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
+                ( [] [Self] [::core::stringify!($name)] [::core::stringify!($name)]
+                  [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?] [$($ra)?]
+                  $({ $( { [$($fcfg)*] $frole $fname : $fty } )* })?
+                  $(( $( { $xrole $xname : $xty } )* ))?
+                  => $msg )
+            ] }
+        } }
 
         $crate::__define_err_block! {
             @types [$ns $docs $rall [] [$($acc)* $( { [] $code } )?]] $($rest)*
@@ -114,10 +118,14 @@ macro_rules! __define_err_emit {
         #[allow(deprecated)]
         impl ::core::fmt::Display for $name {
             fn fmt(&self, __define_err_f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                #[allow(unused_imports)]
+                use $crate::__private::{ShownViaAny as _, ShownViaPath as _};
                 #[allow(unused_variables)]
                 match *self { $(
                     $($vcfg)* $($path)* $({ $( $($fcfg)* ref $fname, )* })? $(( $( ref $xname, )* ))? =>
-                        $crate::__define_err_fmt!(__define_err_f; $msg; $($( $frole $fname )*)? $($( $xrole $xname )*)?),
+                        $crate::__define_err_fmt!(__define_err_f; $msg;
+                            [$($( [$($fcfg)*] $fname )*)? $($( [] $xname )*)?];
+                            $($( $frole $fname )*)? $($( $xrole $xname )*)?),
                 )* }
             }
         }
@@ -499,17 +507,21 @@ macro_rules! __define_err_code {
         $crate::__define_err_code! { @parse check [] $code }
     };
 
-    (@invalid check [$($message:tt)*]) => { ::core::compile_error! { $($message)* } };
-    (@invalid number [$($message:tt)*]) => { 0_u32 };
-    (@invalid replacement [$($message:tt)*]) => { &[] };
-    (@invalid value [$($message:tt)*]) => {
+    // An invalid code reports its own error once. Where its number is a
+    // literal, the block's checks still see that number, so a real duplicate
+    // is caught and nothing else is reported; without one they skip it.
+    (@invalid check [$($n:literal)?] [$($message:tt)*]) => { ::core::compile_error! { $($message)* } };
+    (@invalid number [$n:literal] [$($message:tt)*]) => { $n };
+    (@invalid number [] [$($message:tt)*]) => { $crate::__private::INVALID_NUMBER };
+    (@invalid replacement [$($n:literal)?] [$($message:tt)*]) => { &[] };
+    (@invalid value [$($n:literal)?] [$($message:tt)*]) => {
         $crate::__private::code_or_placeholder($crate::__private::namespace_or_placeholder("A", 4), 0)
     };
-    (@invalid help [$($message:tt)*]) => { "" };
-    (@invalid entry [$($message:tt)*]) => {
+    (@invalid help [$($n:literal)?] [$($message:tt)*]) => { "" };
+    (@invalid entry [$($n:literal)?] [$($message:tt)*]) => {
         $crate::__private::retired_code($crate::__private::namespace_or_placeholder("A", 4), 0)
     };
-    (@invalid const [$($message:tt)*]) => {};
+    (@invalid const [$($n:literal)?] [$($message:tt)*]) => {};
 
     (@width) => { 4 };
     (@width $width:literal) => { $width };
@@ -525,15 +537,15 @@ macro_rules! __define_err_code {
         $crate::__define_err_code! { @do $op [$($args)*] [$n] [$($cname)?] [$help] [$($title)?] [$($since)?] [$($($rep)?)?] }
     };
     (@parse $op:ident [$($args:tt)*] ($n:literal $(, name = $cname:ident)? $(,)?)) => {
-        $crate::__define_err_code! { @invalid $op ["define_errors!: `#[code]` needs `help = \"...\"`: every code ships with its explanation"] }
+        $crate::__define_err_code! { @invalid $op [$n] ["define_errors!: `#[code]` needs `help = \"...\"`: every code ships with its explanation"] }
     };
     (@parse $op:ident [$($args:tt)*] ($n:literal $($rest:tt)*)) => {
-        $crate::__define_err_code! { @invalid $op [
+        $crate::__define_err_code! { @invalid $op [$n] [
             "define_errors!: write `#[code(n, name = NAME, help = \"...\", title = \"...\", deprecated = \"since\", replacement = n)]` in this order; only the number and `help` are required"
         ] }
     };
     (@parse $op:ident [$($args:tt)*] $($rest:tt)*) => {
-        $crate::__define_err_code! { @invalid $op [
+        $crate::__define_err_code! { @invalid $op [] [
             "define_errors!: a code number must be an integer literal from 0 to 16777215, for example `#[code(42, help = \"...\")]`"
         ] }
     };
@@ -662,17 +674,48 @@ macro_rules! __define_err_probe {
     }};
 }
 
-/// The body of one `Display` arm.
+/// The impls of a type that carries `#[cfg]`: its `cfg` attributes, and no
+/// other, on one `const _` block that holds them, so they go wherever the type
+/// goes. A type without `#[cfg]` gets its impls as they are. The attributes
+/// are always copied from the user's input.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __define_err_cfg {
+    ([#[cfg $($c:tt)*] $($rest:tt)*] [$($keep:tt)*] $body:tt) => {
+        $crate::__define_err_cfg! { [$($rest)*] [$($keep)* #[cfg $($c)*]] $body }
+    };
+    ([#[$($other:tt)*] $($rest:tt)*] [$($keep:tt)*] $body:tt) => {
+        $crate::__define_err_cfg! { [$($rest)*] [$($keep)*] $body }
+    };
+    ([] [] { $($body:tt)* }) => {
+        $($body)*
+    };
+    ([] [$($keep:tt)+] { $($body:tt)* }) => {
+        $($keep)+
+        const _: () = {
+            $($body)*
+        };
+    };
+}
+
+/// The body of one `Display` arm. A plain message names fields only inside
+/// its string, so each field is first rebound to what the message shows (a
+/// `Path` through `display()`, anything else unchanged; the dispatch of
+/// `shown_of!` written out, which builds 5 to 8% faster than a nested macro
+/// per field; the traits are imported once by the `Display` impl),
+/// under the field's own `cfg`. A message with arguments is left as written:
+/// its expressions may already call `display()`.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __define_err_fmt {
-    ($f:ident; $lit:literal; $($roles:tt)*) => {
+    ($f:ident; $lit:literal; [$( [$($cfg:tt)*] $n:ident )*]; $($roles:tt)*) => {{
+        $( $($cfg)* let $n = (&&$crate::__private::Wrap($n)).__define_err_shown(); )*
         ::core::write!($f, $lit)
-    };
-    ($f:ident; ($lit:literal $(, $($args:tt)*)?); $($roles:tt)*) => {
+    }};
+    ($f:ident; ($lit:literal $(, $($args:tt)*)?); [$($shown:tt)*]; $($roles:tt)*) => {
         ::core::write!($f, $lit $(, $($args)*)?)
     };
-    ($f:ident; transparent; $($roles:tt)*) => {
+    ($f:ident; transparent; [$($shown:tt)*]; $($roles:tt)*) => {
         $crate::__define_err_transparent!(@fmt [$f]; $($roles)*)
     };
     ($f:ident; $($other:tt)*) => {

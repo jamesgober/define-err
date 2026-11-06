@@ -39,12 +39,12 @@ Exit: page-db's test suite passes on a pilot branch with byte-identical messages
 
 ## v0.4.0 - Extended: codes and metadata (DONE, 2026-11-02)
 API: DEF-13 to DEF-23, DEF-25, CODE-01 to CODE-09, SEV-01 to SEV-04, CAT-01 to CAT-07, KND-01 to KND-05, INF-01 (all methods) to INF-06, PRB-01 to PRB-03.
-Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; five-digit codes display as `DIS-00001`.
+Exit: the `PLAN.md` 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; five-digit codes display as `SVC-00001`.
 - [x] Code packing and parsing; fuzz targets `code_parse`, `code_from_u64`, `severity_parse`, `category_parse`, `probe_decode`, each run 60 seconds with no finding (D-042).
 - [x] Compile-time checks (7.13) with UI tests, each mistake reported once (D-035); the duplicate-span technique verified on stable and 1.81.
 - [x] Category tables, severity names, kind bits, code packing, and probe strings locked against the golden files (`tests/golden.rs`).
 - [x] Edge cases E-33 to E-64, E-87 to E-89 (`tests/define_meta.rs`, `tests/edge_codes.rs`, unit tests, UI cases).
-- [x] Exit: the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; `DIS-00001` displays with five digits, also through the probe (D-033).
+- [x] Exit: the 7.4.4 example compiles and every assertion in `tests/define_meta.rs` passes; `SVC-00001` displays with five digits, also through the probe (D-033).
 
 ## v0.5.0 - Feature complete: facade and record (DONE, 2026-11-02)
 API: FAC-01 to FAC-18, FAC-20, FAC-21, REC-01 to REC-07, TST-01, TST-02, DEF-24.
@@ -67,11 +67,11 @@ Exit: no open fuzz finding; every threat has a passing attack test.
 - [x] Every fuzz target 24 hours; attack tests T1 to T17; Miri over the suite; loom models complete; 8-hour soak.
 - [x] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
 
-## v0.8.0 - Alpha: first migrations
+## v0.8.0 - Alpha: first migrations (DONE, 2026-11-05)
 Exit: each migrated crate's CI is green on its own repository against the published 0.8.0.
-- [ ] Migrate page-db, Hive DB distro, hive-exec; migrate kraken (MSRV 1.80 to 1.81).
-- [ ] Remove the unused `thiserror` dependency from cli-forge.
-- [ ] Feedback from each migration recorded; fixes land here.
+- [x] Migrate page-db and an internal consumer's two crates; migrate kraken (MSRV 1.80 to 1.81). Draft PRs on each repository; each owner merges (D-074).
+- [x] Remove the unused `thiserror` dependency from cli-forge: already gone upstream (D-071).
+- [x] Feedback from each migration recorded; fixes land here (D-067 to D-073).
 
 ## v0.9.0 - Beta and release candidates
 Exit: API unchanged across the last release candidate; L2 and L3 owners sign off on the contract; James's review below done.

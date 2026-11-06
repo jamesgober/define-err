@@ -6,7 +6,7 @@
 DbError::Timeout (code DB-0001, DeadlineExceeded, public message)	\0DE13b34a2f2600000011104000000000000000101|DbError::Timeout|The database is busy. Try again shortly.
 DbError::Corrupt (code DB-0002, DataLoss, CRITICAL, ERROR|SECURITY)	\0DE13b34a2f260000002140f000000000000001100|DbError::Corrupt
 DbError::Quota (code DB-0010, ResourceExhausted, kinds project(0))	\0DE13b34a2f26000000a1108000000010000000000|DbError::Quota
-DistroError::Config (code DIS-00001, InvalidArgument)	\0DE13c133b92800000010d03000000000000000100|DistroError::Config
+ServiceError::Config (code SVC-00001, InvalidArgument)	\0DE17b7a347a800000010d03000000000000000100|ServiceError::Config
 PageError::NotFound (plain: no code, no category)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound
 AppError::Other (transparent over a foreign type)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000102|AppError::Other
 Cancelled (unit struct, plain)	\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|Cancelled

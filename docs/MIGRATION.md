@@ -17,13 +17,15 @@ A crate can move from route 2 to route 1 later with no change its users can see.
 | `#[error("page {page_id} not found")] NotFound { page_id: u64 },` | `NotFound { page_id: u64 } => "page {page_id} not found",` |
 | `#[error("page i/o error: {0}")] Io(#[from] io::Error),` | `Io(#[from] source: io::Error) => "page i/o error: {source}",` |
 | `#[error("invalid usage: {0}")] InvalidUsage(String),` | `InvalidUsage(detail: String) => "invalid usage: {detail}",` |
+| `#[error("file not found: {0}")] NotFound(PathBuf),` | `NotFound(path: PathBuf) => "file not found: {path}",`: a `Path`, `&Path`, or `PathBuf` shows through `display()`, as with thiserror (since 0.8, with the `std` feature; on 0.7, write `("file not found: {}", path.display())`) |
 | `#[error("{}", .diagnostic.format())] Diag { diagnostic: D },` | `Diag { diagnostic: D } => ("{}", diagnostic.format()),` |
 | `#[error("size {size} not in {min}..={max}", min = crate::MIN, max = crate::MAX)]` | `=> ("size {size} not in {min}..={max}", min = crate::MIN, max = crate::MAX)` |
 | `#[error(transparent)] Other(#[from] OtherError),` | `Other(#[from] inner: OtherError) => transparent,` |
 | `#[source] cause: E`, or a field named `source` | unchanged |
 | `#[non_exhaustive]` on the enum | keep it or delete it: the macro adds it when absent and never adds a second copy |
 | an enum published as exhaustive | add `#[exhaustive]`, so the migration is not a breaking change |
-| a code inside the message: `#[error("DIS-00001: configuration error [{field}]")]` | `namespace = "DIS", width = 5;`, `#[code(1, help = "...")]`, and the message without the prefix |
+| a code inside the message: `#[error("SVC-00001: configuration error [{field}]")]` | `namespace = "SVC", width = 5;`, `#[code(1, help = "...")]`, and the message without the prefix; or keep the prefix in the message, so `Display` stays byte-identical, and state the code again in `#[code]` |
+| an existing code with no explanation | every `#[code]` needs `help = "..."`: the catalog ships each code with what to do about it |
 
 Tuple fields get a name, `Read(page: u64, got: usize)`, so the message can use it: a declarative macro cannot look inside a string literal for `{0}`. The field is still positional when the variant is built, `ShortRead(7, 12)`.
 
@@ -34,6 +36,8 @@ Tuple fields get a name, `Read(page: u64, got: usize)`, so the message can use i
 - An enum that was not `#[non_exhaustive]` becomes so unless you write `#[exhaustive]`. For a published crate, that is a breaking change you must choose.
 - `Error::description()` returns the identity probe instead of the deprecated default text. Nothing in the standard library calls it.
 - The MSRV becomes at least 1.81, the first release with `core::error::Error`.
+- The type implements `define_err::ErrorInfo`, so define-err becomes a public dependency. For a crate past 1.0 that matters: a later define-err minor is a different `ErrorInfo`, and `cargo semver-checks` cannot see that. Until define-err 1.0, say in your changelog that the `ErrorInfo` impl follows define-err's version. At 1.0, define-err's last 0.x minor gets a patch release that re-exports 1.0's traits, so crates on either share one `ErrorInfo`.
+- A type that already has its own inherent `code()` keeps it: an inherent method wins over `ErrorInfo::code`, so `err.code()` returns what it always did, and `ErrorInfo::code(&err)` returns the `Code`.
 
 ### After the move
 

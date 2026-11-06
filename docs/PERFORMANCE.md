@@ -105,6 +105,17 @@ Criterion means at the same load. The first column was built with this crate's f
 
 Reading the probe outside the guard would win back the half nanosecond and let a `description()` that reports itself recurse without limit.
 
+### What 0.8 changed
+
+0.8 shows a `Path` or `PathBuf` field through `display()`, as thiserror does (D-067 in `dev/PLAN.md`). Nothing changes at run time: the rebinding inlines to the reference the arm already had. It costs at compile time, one `let` and one method lookup per field of every plain message. Rebuilds of the crates of `tools/build-time/compare.py`, `0.7.0` and `0.8.0` built in turn for 15 rounds, fastest of each:
+
+| Rebuild | 0.7.0 | 0.8.0 | Change |
+|---|---|---|---|
+| 500-variant crate | 0.409 s | 0.454 s | +10.9% |
+| 20-enum crate, one message edited | 0.100 s | 0.106 s | +6.0% |
+
+The first form of the change called a helper macro per field and cost 4.5 to 8% more than this; it was rewritten before release.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.
@@ -166,4 +177,4 @@ Each has a reviewed reason (D-060 in `dev/PLAN.md`) and goes back on the list in
 | `report` to a no-op under 10 ns | 31 ns | The same validation, once per event. Decoding lazily would look better here and only move the cost to any reporter that reads the code. |
 | rebuild no slower than thiserror | 0.2 s slower on Linux | A macro expansion re-runs on every build, and a declarative macro produces more text than a derive. The plain arm halved it for enums without metadata (D-059). |
 
-The 500-variant enum meets its target of under 1 s of expansion, but is still almost twice thiserror's total. Both this and the rebuild come from work per variant, which is the first item in the polish pass.
+The 500-variant enum meets its target of under 1 s of expansion, but is still almost twice thiserror's total. Both this and the rebuild come from work per variant, which is the first item in the polish pass. 0.8's path display adds to it, by the figures in [What 0.8 changed](#what-08-changed).
