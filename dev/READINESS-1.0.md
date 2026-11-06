@@ -45,4 +45,4 @@
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,201 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,230 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

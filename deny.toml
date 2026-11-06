@@ -35,6 +35,9 @@ exceptions = []
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# The second-crate test fixture (`tests/fixture`) is a path dev-dependency with no
+# version; cargo drops it on publish, so it is not a wildcard on crates.io.
+allow-wildcard-paths = true
 highlight = "all"
 workspace-default-features = "allow"
 external-default-features = "allow"
