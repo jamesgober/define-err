@@ -67,11 +67,11 @@ Exit: no open fuzz finding; every threat has a passing attack test.
 - [x] Every fuzz target 24 hours; attack tests T1 to T17; Miri over the suite; loom models complete; 8-hour soak.
 - [x] `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/PLATFORM-NOTES.md`.
 
-## v0.8.0 - Alpha: first migrations
+## v0.8.0 - Alpha: first migrations (DONE, 2026-11-05)
 Exit: each migrated crate's CI is green on its own repository against the published 0.8.0.
-- [ ] Migrate page-db and an internal consumer's two crates; migrate kraken (MSRV 1.80 to 1.81).
-- [ ] Remove the unused `thiserror` dependency from cli-forge.
-- [ ] Feedback from each migration recorded; fixes land here.
+- [x] Migrate page-db and an internal consumer's two crates; migrate kraken (MSRV 1.80 to 1.81). Draft PRs on each repository; each owner merges (D-074).
+- [x] Remove the unused `thiserror` dependency from cli-forge: already gone upstream (D-071).
+- [x] Feedback from each migration recorded; fixes land here (D-067 to D-073).
 
 ## v0.9.0 - Beta and release candidates
 Exit: API unchanged across the last release candidate; L2 and L3 owners sign off on the contract; James's review below done.

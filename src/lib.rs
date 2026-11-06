@@ -145,8 +145,8 @@
 //!
 //! ## Status
 //!
-//! `0.7.0`: feature complete, measured, and hardened. The public API of 1.0
-//! is written in `docs/API.md` and what the macro expands to in
+//! `0.8.0`, the alpha: feature complete, measured, hardened, and checked
+//! against its first migrations. The public API of 1.0 is written in `docs/API.md` and what the macro expands to in
 //! `docs/GENERATED-CODE.md` (both in the
 //! [repository](https://github.com/jamesgober/define-err)).
 

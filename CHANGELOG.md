@@ -11,6 +11,13 @@
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] - 2026-11-05
+
+The alpha. Five crates in four repositories were migrated onto 0.7.0 as draft
+pull requests, with byte-identical messages; what they found is fixed here.
+
 ### Added
 
 - `short_file` and `TrailEntry::short_file`: a location's file as a log
@@ -21,10 +28,11 @@
 ### Fixed
 
 - A `PathBuf`, `Path`, or `&Path` field named in a plain message shows
-  through `display()`, as with thiserror (with the `std` feature, a default). It used to be a compile error
-  (`PathBuf` does not implement `Display`), so a thiserror message such as
-  `"file not found: {0}"` on a `PathBuf` could not be kept as written. Every
-  other field formats exactly as before.
+  through `display()`, as with thiserror (with the `std` feature, a
+  default). It used to be a compile error (`PathBuf` does not implement
+  `Display`), so a thiserror message such as `"file not found: {0}"` on a
+  `PathBuf` could not be kept as written. Every other field formats exactly
+  as before.
 - `#[cfg(...)]` on a whole type compiles out its impls with it. They used to
   stay, and fail to compile once the type was gone.
 - A `#[code]` without `help`, or with its fields out of order, reports that
@@ -38,8 +46,10 @@
 
 ### Generated code
 
-- A plain message's `Display` arm rebinds each field through
-  `__private::shown_of!` first. New `__private` items: `shown_of!`,
+- A plain message's `Display` arm first rebinds each field to
+  `(&&__private::Wrap(field)).__define_err_shown()`, the dispatch of
+  `ShownViaPath` and `ShownViaAny`, which the `Display` impl imports once.
+  New `__private` items: `shown_of!` (the same dispatch as a macro),
   `ShownViaPath`, `ShownViaAny`, `check_number`, `INVALID_NUMBER`.
   `check_block` skips `INVALID_NUMBER`. The impls of a type with `#[cfg]`
   sit in one `const _` block carrying those `cfg` attributes.
@@ -368,7 +378,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/jamesgober/define-err/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jamesgober/define-err/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/define-err/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jamesgober/define-err/compare/v0.4.0...v0.5.0
