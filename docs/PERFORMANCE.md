@@ -116,6 +116,19 @@ Reading the probe outside the guard would win back the half nanosecond and let a
 
 The first form of the change called a helper macro per field and cost 4.5 to 8% more than this; it was rewritten before release.
 
+### What 0.9 changed
+
+A plain enum (no namespace, no metadata, every message a literal) is written in one pass over its variants instead of five (D-082 in `dev/PLAN.md`). The generated code is the same, token for token. The cost was in rustc's matching of `macro_rules!` patterns: each pass over the whole list of variants matches a pattern with many optional groups, and that work grows faster than the number of variants (250, 500, and 1,000 variants of the old fast path alone took 0.12, 0.29, and 1.05 s to expand). Rebuilds of the crates of `tools/build-time/compare.py`, the two versions alternated round by round, fastest of each:
+
+| Rebuild | before | after | Change |
+|---|---|---|---|
+| 500-variant crate, 15 rounds | 0.571 s | 0.414 s | -27.6% |
+| 500-variant crate, 10 rounds | 0.646 s | 0.457 s | -29.2% |
+| 20-enum crate, 15 rounds | 0.141 s | 0.123 s | -12.5% |
+| 20-enum crate, 10 rounds | 0.165 s | 0.163 s | -1.3% |
+
+Types with a namespace or metadata keep the general passes. Nothing changes at run time.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.

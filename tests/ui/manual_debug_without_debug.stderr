@@ -11,7 +11,7 @@ error[E0277]: `E` doesn't implement `std::fmt::Debug`
   |
 note: required by a bound in `std::error::Error`
  --> $RUST/core/src/error.rs
-  = note: this error originates in the macro `$crate::__define_err_emit` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the macro `$crate::__define_err_enum` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: consider annotating `E` with `#[derive(Debug)]`
  --> src/macros/emit.rs
   |
@@ -47,7 +47,7 @@ note: required by a bound in `ErrorInfo`
   |
   | pub trait ErrorInfo: core::error::Error {
   |                      ^^^^^^^^^^^^^^^^^^ required by this bound in `ErrorInfo`
-  = note: this error originates in the macro `$crate::__define_err_emit` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the macro `$crate::__define_err_enum` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: consider annotating `E` with `#[derive(Debug)]`
  --> src/macros/emit.rs
   |

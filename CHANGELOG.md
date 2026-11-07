@@ -24,6 +24,12 @@
   `check_number` no longer skips `INVALID_NUMBER`; the block calls it only for
   a code whose number is a literal.
 
+### Changed
+
+- A plain enum (no namespace, no metadata, every message a literal) expands
+  in one pass over its variants. The generated code is unchanged; a rebuild
+  of a 500-variant enum is 28% faster.
+
 ### Added
 
 - `tools/invariants.py`, run by CI: no runtime dependency in any feature mode,

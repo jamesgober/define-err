@@ -383,6 +383,117 @@ macro_rules! __define_err_meta_slot {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __define_err_enum {
+    // Fast path for a plain enum: no namespace, no metadata, every message a
+    // literal. One pass over the variants writes every item but the enum
+    // itself (`@enum_def`, a cheap pass); the general path hands the list on
+    // to four more passes, and each pass over a long list costs more than it
+    // emits (D-082). The items are those of the
+    // general path's plain arms; `tests/define_meta.rs` holds the two paths
+    // to the same answers.
+    (@start [[] $docs:tt $rall:tt $rf:tt [$($acc:tt)*] [$($rest:tt)*]] [$($tattr:tt)*] ($vis:vis) $name:ident { $(
+        $(#[doc $($doc:tt)*])*
+        $(#[cfg $cfg:tt])*
+        $vn:ident
+        $({ $(
+            $(#[doc $($bdoc:tt)*])*
+            $(#[from] $bfrom:ident)?
+            $(#[source] $bsrc:ident)?
+            $(#[location] $bloc:ident)?
+            $(#[retry_after] $bra:ident)?
+            $($bplain:ident)?
+            : $bty:ty
+        ),* $(,)? })?
+        $(( $(
+            $(#[doc $($tdoc:tt)*])*
+            $(#[from] $tfrom:ident)?
+            $(#[source] $tsrc:ident)?
+            $(#[location] $tloc:ident)?
+            $(#[retry_after] $tra:ident)?
+            $($tplain:ident)?
+            : $tty:ty
+        ),* $(,)? ))?
+        => $msg:literal
+    ),* $(,)? }) => {
+        $crate::__define_err_emit! { @enum_def [$($tattr)*] ($vis) $name [ $(
+            ( [$(#[cfg $cfg])*] [$(#[doc $($doc)*])*] $vn
+              $({ $( $(#[doc $($bdoc)*])* $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)?: $bty, )* })?
+              $(( $( $(#[doc $($tdoc)*])* $tty, )* ))? )
+        )* ] }
+
+        $crate::__define_err_cfg! { [$($tattr)*] [] {
+            #[allow(deprecated)]
+            impl ::core::fmt::Display for $name {
+                fn fmt(&self, __define_err_f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    #[allow(unused_imports)]
+                    use $crate::__private::{ShownViaAny as _, ShownViaPath as _};
+                    #[allow(unused_variables)]
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn $({ $( ref $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)?, )* })? $(( $( ref $($tfrom)? $($tsrc)? $($tloc)? $($tra)? $($tplain)?, )* ))? =>
+                            $crate::__define_err_fmt!(__define_err_f; $msg;
+                                [$($( [] $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)? )*)? $($( [] $($tfrom)? $($tsrc)? $($tloc)? $($tra)? $($tplain)? )*)?]; $($( $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? )*)? $($( $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? )*)?),
+                    )* }
+                }
+            }
+
+            #[allow(deprecated)]
+            impl ::core::error::Error for $name {
+                fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
+                    #[allow(unused_variables)]
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn $({ $( ref $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)?, )* })? $(( $( ref $($tfrom)? $($tsrc)? $($tloc)? $($tra)? $($tplain)?, )* ))? => $crate::__define_err_source!($msg; $($( $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? )*)? $($( $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? )*)?),
+                    )* }
+                }
+
+                fn description(&self) -> &str {
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn { .. } => ::core::concat!(
+                            " DE1xxxxxxxxxxxxxxxx1102000000000000000100|",
+                            ::core::stringify!($name), "::", ::core::stringify!($vn)
+                        ),
+                    )* }
+                }
+            }
+
+            const _: () = $crate::__private::check_names(&[ $( $(#[cfg $cfg])* ::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn)), )* ]);
+
+            #[allow(deprecated)]
+            impl $crate::ErrorInfo for $name {
+                fn retry_after(&self) -> ::core::option::Option<::core::time::Duration> {
+                    #[allow(unused_variables)]
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn $({ $( ref $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)?, )* })? $(( $( ref $($tfrom)? $($tsrc)? $($tloc)? $($tra)? $($tplain)?, )* ))? => $crate::__define_err_value!(@retry_after [] []; $($( $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? )*)? $($( $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? )*)?),
+                    )* }
+                }
+
+                fn location(&self) -> ::core::option::Option<$crate::Location> {
+                    #[allow(unused_variables)]
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn $({ $( ref $($bfrom)? $($bsrc)? $($bloc)? $($bra)? $($bplain)?, )* })? $(( $( ref $($tfrom)? $($tsrc)? $($tloc)? $($tra)? $($tplain)?, )* ))? => $crate::__define_err_location!($msg; $($( $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? )*)? $($( $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? )*)?),
+                    )* }
+                }
+
+                fn type_name(&self) -> &'static str {
+                    match *self { $(
+                        $(#[cfg $cfg])* Self::$vn { .. } => ::core::concat!(::core::stringify!($name), "::", ::core::stringify!($vn)),
+                    )* }
+                }
+            }
+
+            $(
+                $(#[cfg $cfg])*
+                $crate::__define_err_from! {
+                    $name [Self::$vn]
+                    $( braced $( $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? : $bty ; )* )?
+                    $( tuple $( $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? : $tty ; )* )?
+                }
+            )*
+        } }
+
+        $crate::__define_err_block! {
+            @types [[] $docs $rall [] [$($acc)*]] $($rest)*
+        }
+    };
+
     // Fast path: the whole enum in canonical form, in one non-recursive arm.
     (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $(
         $(#[doc $($doc:tt)*])*

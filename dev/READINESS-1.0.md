@@ -39,10 +39,10 @@
 | `report` filtered, 5.9 ns against 3 | D-060 | Open. |
 | `identify` generated, 26 ns against 10; `report` to a no-op, 33 ns against 10 | D-060 | Kept unless a faster validation keeps the same checks: a hostile probe is validated once. |
 | `log::warn!` comparison at level `Off` | D-060 | Kept: both are one load and a branch; the 20% target cannot be met. |
-| Incremental rebuild slower than thiserror on one crate | D-060 | Open: the main 0.9 tuning item. A per-variant `const` row was tried and was slower (D-077). |
+| Incremental rebuild slower than thiserror on one crate | D-060 | Reduced in 0.9: a plain enum expands in one pass, 28% faster on 500 variants (D-082); a per-variant `const` row was slower (D-077). Still slower than thiserror; types with metadata keep five passes. |
 | 500-variant rebuild +11% from path display | D-067 | Kept for thiserror parity; re-measured with the tuning pass. |
 | Early severity read drops a malformed low-severity probe | D-063 | Kept: severity filtering is not a security boundary (`docs/SECURITY.md`). |
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,232 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,327 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
