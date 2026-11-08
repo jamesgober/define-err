@@ -11,6 +11,14 @@
 
 ## [Unreleased]
 
+---
+
+## [0.9.0] - 2026-11-08
+
+The beta. The first release of the pre-1.0 polish pass: the security
+re-run's one finding, a faster plain enum, and a test or a check for every
+requirement.
+
 ### Fixed
 
 - A malformed `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`,
@@ -38,6 +46,8 @@
   every message of `define_errors!`, and the size of `src`.
 - 23 compile-fail cases, one for each message that had none, and one showing
   that a generated enum is `#[non_exhaustive]` in the crates that use it.
+- A property test for `short_file`: what it returns is always a suffix of
+  its input, and a relative path comes back unchanged.
 
 ---
 
@@ -406,7 +416,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jamesgober/define-err/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jamesgober/define-err/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jamesgober/define-err/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/define-err/compare/v0.5.0...v0.6.0
