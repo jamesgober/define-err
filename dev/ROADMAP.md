@@ -76,6 +76,7 @@ Exit: each migrated crate's CI is green on its own repository against the publis
 ## v0.9.0 - Beta and release candidates
 Exit: API unchanged across the last release candidate; L2 and L3 owners sign off on the contract; James's review below done.
 - [x] `0.9.0` released, the first beta (2026-11-08, D-083): the security re-run's finding (D-081), the plain enum in one pass (D-082), the requirement map (D-078 to D-080).
+- [x] `0.9.1` released (2026-11-08): `Code` `Display` about 10% faster and the control-character scan four times faster (D-084, D-085); the D-060 run-time misses looked at again, with what stays and why in D-084.
 - [ ] Migrate noml-rust and mod-cli (draft PRs open); config-lib's path decided with James (`PLAN.md` 19.4).
 - [ ] L2 builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite; L3 reads codes through the probe.
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.

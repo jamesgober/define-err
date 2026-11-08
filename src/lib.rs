@@ -145,7 +145,7 @@
 //!
 //! ## Status
 //!
-//! `0.9.0`, the beta: feature complete, measured, hardened, checked against
+//! `0.9.1`, the beta: feature complete, measured, hardened, checked against
 //! real migrations, and in its pre-1.0 polish pass. The public API of 1.0 is written in `docs/API.md` and what the macro expands to in
 //! `docs/GENERATED-CODE.md` (both in the
 //! [repository](https://github.com/jamesgober/define-err)).
