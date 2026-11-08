@@ -9,5 +9,8 @@ fuzz_target!(|raw: u64| {
         assert_eq!(code.as_u64(), raw);
         assert_eq!(Code::parse(&code.to_string()).map(Code::identity), Ok(code.identity()));
         assert!(code.to_string().bytes().all(|b| b >= 0x20));
+        let namespace = code.namespace();
+        let width = usize::from(namespace.width());
+        assert_eq!(code.to_string(), format!("{}-{:0width$}", &*namespace.as_str(), code.number()));
     }
 });
