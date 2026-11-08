@@ -45,4 +45,4 @@ Each requirement of `dev/PLAN.md` section 5 and the tests that check it (definit
 | NFR-11 `no_std` targets | CI `no-std` job (thumbv7em, thumbv6m, riscv32imac, wasm32) | |
 | NFR-12 a compile-fail case per error path | `tools/invariants.py`, CI `ui` job | |
 | NFR-13 API fits one page per module | the 1.0 audit (`docs/STABILITY-1.0.md`) | A review, not a test. |
-| NFR-14 source size | `tools/invariants.py` | 5,326 lines of code, over the 5,000 target (D-080). |
+| NFR-14 source size | `tools/invariants.py` | 5,351 lines of code, over the 5,000 target (D-080). |
