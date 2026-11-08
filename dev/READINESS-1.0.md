@@ -9,6 +9,7 @@
 | J-1 | config-lib's path (`PLAN.md` 19.4): it is published at 1.1.0 with MSRV 1.75, and define-err needs 1.81, so moving it is an MSRV raise after 1.0. | (b): stay on thiserror in 1.x and migrate in config-lib 2.0, batched with its next planned breaking change. |
 | J-2 | The pre-1.0 review (ROADMAP 0.9), before the API is frozen. | Review `docs/API.md` and `docs/GENERATED-CODE.md` as they stand at the last 0.9 release candidate. |
 | J-3 | The go for 1.0.0. | Only after every line below is done or carries a reason you accept. |
+| J-4 | The support window in `docs/STABILITY-1.0.md`: how long 1.x gets fixes once 2.0 is out. It is a public commitment. | Security and soundness fixes for 1.x for 12 months after 2.0.0 is published, on the 1.x minimum Rust version. |
 
 ## Definition of done, line by line
 
