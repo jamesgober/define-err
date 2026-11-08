@@ -13,6 +13,22 @@
 
 ---
 
+## [0.9.1] - 2026-11-08
+
+The polish pass, continued: two hot paths made faster, with nothing else
+changed.
+
+### Changed
+
+- `Code`'s `Display` is about 10% faster: each character and digit is
+  computed on its own instead of by repeated division. The text is
+  unchanged.
+- `ChainEntry::has_control` is found eight bytes at a time: about four
+  times faster on a message of a hundred bytes or more. It means what it
+  meant.
+
+---
+
 ## [0.9.0] - 2026-11-08
 
 The beta. The first release of the pre-1.0 polish pass: the security
@@ -416,7 +432,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/jamesgober/define-err/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/jamesgober/define-err/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jamesgober/define-err/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jamesgober/define-err/compare/v0.6.0...v0.7.0

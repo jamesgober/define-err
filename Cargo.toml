@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.9.0"
+version = "0.9.1"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and

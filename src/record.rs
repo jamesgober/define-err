@@ -267,6 +267,35 @@ fn floor_boundary(text: &str, index: usize) -> usize {
     at
 }
 
+/// Whether `text` holds a character for which `char::is_control` is true
+/// (C0, DEL, C1), eight bytes at a time (PLAN 10.2, D-085). Each test puts a
+/// match into its byte's high bit through the borrow of a subtraction, which
+/// is exact for "is there one". C1 is U+0080 to U+009F, so only text with a
+/// 0xC2 lead byte takes the check by character.
+fn has_control(text: &str) -> bool {
+    const ONES: u64 = 0x0101_0101_0101_0101;
+    let (mut found, mut lead) = (0_u64, 0_u64);
+    let mut scan = |word: u64| {
+        found |= word.wrapping_sub(ONES * 0x20) & !word;
+        let del = word ^ (ONES * 0x7f);
+        found |= del.wrapping_sub(ONES) & !del;
+        let c2 = word ^ (ONES * 0xc2);
+        lead |= c2.wrapping_sub(ONES) & !c2;
+    };
+    let mut bytes = text.as_bytes();
+    while let Some((chunk, rest)) = bytes.split_first_chunk::<8>() {
+        scan(u64::from_le_bytes(*chunk));
+        bytes = rest;
+    }
+    let mut tail = [b' '; 8];
+    for (slot, byte) in tail.iter_mut().zip(bytes) {
+        *slot = *byte;
+    }
+    scan(u64::from_le_bytes(tail));
+    let high = ONES * 0x80;
+    found & high != 0 || (lead & high != 0 && text.chars().any(char::is_control))
+}
+
 /// Writes `value` within `limit` bytes; returns the text and whether it was
 /// cut. A `Display` that fails by itself gives the fixed marker.
 fn bounded(value: &dyn fmt::Display, limit: usize) -> (String, bool) {
@@ -512,7 +541,7 @@ impl ErrorRecord {
         let name = &type_name[..floor_boundary(type_name, MAX_TYPE_NAME)];
         self.used += text.len();
         self.chain.push(ChainEntry {
-            has_control: text.chars().any(char::is_control),
+            has_control: has_control(&text),
             message: text,
             code,
             type_name: Cow::Owned(String::from(name)),
@@ -680,7 +709,46 @@ impl fmt::Display for ErrorRecord {
 
 #[cfg(test)]
 mod tests {
-    use super::{bounded, floor_boundary};
+    use super::{bounded, floor_boundary, has_control};
+
+    #[test]
+    fn test_has_control_agrees_with_char_is_control() {
+        // Every scalar value under Miri would take hours: there, the ranges
+        // around each class only.
+        let all = 0..=0x10_FFFF_u32;
+        let few = [
+            0..=0x100,
+            0x2000..=0x2030,
+            0xFEFF..=0xFF00,
+            0x10_FFF0..=0x10_FFFF,
+        ];
+        let values: alloc::vec::Vec<u32> = if cfg!(miri) {
+            few.into_iter().flatten().collect()
+        } else {
+            all.collect()
+        };
+        let mut buffer = [0_u8; 4];
+        for c in values.into_iter().filter_map(char::from_u32) {
+            let text = c.encode_utf8(&mut buffer);
+            assert_eq!(has_control(text), c.is_control(), "{c:?}");
+            if cfg!(miri) || c.is_control() || u32::from(c) % 97 == 0 {
+                // Across a word boundary, and in the tail.
+                for pad in ["", "a", "abcdefg", "abcdefgh"] {
+                    let joined = alloc::format!("{pad}{c}xyz");
+                    assert_eq!(has_control(&joined), c.is_control(), "{c:?} after {pad:?}");
+                }
+            }
+        }
+        assert!(!has_control(""));
+        assert!(has_control("forged\nline"));
+        assert!(has_control(
+            "a long enough message with an escape \u{1b}[31m in it"
+        ));
+        assert!(!has_control(
+            "Datei nicht gefunden: /home/jürgen/größe.txt, 5 °C"
+        ));
+        assert!(has_control("NEL \u{85} after a degree sign °"));
+    }
 
     #[test]
     fn test_bounded_cuts_on_a_character_boundary() {

@@ -1,6 +1,6 @@
 # define-err - 1.0 readiness
 
-> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-08, at 0.9.0.
+> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-08, at 0.9.1.
 
 ## Decisions for James
 
@@ -34,9 +34,9 @@
 
 | Item | Source | State |
 |---|---|---|
-| `Code` `Display` 28 ns against a 20 ns target | D-060 | Open: re-measure on a quieter machine; the safe `from_utf8` path stays. |
-| `warn()` after first delivery, 9.5 ns against 5 | D-060 | Open: `warn!` (0.5 ns) is the fast form. |
-| `report` filtered, 5.9 ns against 3 | D-060 | Open. |
+| `Code` `Display` 24 ns against a 20 ns target | D-060, D-084 | Reduced in 0.9.1 (about 10%). Kept: `write!` of a short `&str` is 10.5 ns on its own, and the safe `from_utf8` check (4.5 ns) stays, since `unsafe` stays in one module. |
+| `warn()` after first delivery, 9.5 ns against 5 | D-060, D-084 | Kept: a cheaper key could deliver a site twice or drop a warning on a collision; `warn!` (0.5 ns) is the fast form. |
+| `report` filtered, 5.9 ns against 3 | D-060, D-084 | Kept: the cost is the panic guard around the error's own code (D-062); `report_with` is 0.64 ns. |
 | `identify` generated, 26 ns against 10; `report` to a no-op, 33 ns against 10 | D-060 | Kept unless a faster validation keeps the same checks: a hostile probe is validated once. |
 | `log::warn!` comparison at level `Off` | D-060 | Kept: both are one load and a branch; the 20% target cannot be met. |
 | Incremental rebuild slower than thiserror on one crate | D-060 | Reduced in 0.9: a plain enum expands in one pass, 28% faster on 500 variants (D-082); a per-variant `const` row was slower (D-077). Still slower than thiserror; types with metadata keep five passes. |
@@ -45,4 +45,4 @@
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,326 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,351 lines of code against a 5,000 target | NFR-14, D-080 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

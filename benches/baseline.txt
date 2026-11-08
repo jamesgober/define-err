@@ -1,7 +1,7 @@
 # Floors from benches/floor.rs: Ryzen 9 9950X3D, WSL2 Ubuntu, rustc 1.99.0, 2026-11-03,
-# version 0.7.0, best of four runs. Compare with tools/bench-compare.py. Method: docs/PERFORMANCE.md.
+# version 0.7.0, best of four runs; code_display from 0.9.1 (D-084), 2026-11-08. Compare with tools/bench-compare.py. Method: docs/PERFORMANCE.md.
 empty_loop                             0.22 ns
-code_display                          25.48 ns
+code_display                          23.60 ns
 code_parse                             7.71 ns
 code_from_u64                          3.06 ns
 error_info_code                        0.23 ns

@@ -32,7 +32,7 @@
         <strong>MSRV is 1.81+</strong> (Rust 2021 edition): the first release with <code>core::error::Error</code>.
     </p>
     <blockquote>
-        <strong>Status: beta (<code>0.9.0</code>): feature complete, measured, hardened, checked against real migrations, and in its pre-1.0 polish pass.</strong> <code>define_errors!</code> has thiserror parity and optional codes, a compile-time catalog, severity, categories, kinds, public messages, and retry advice. The reporting facade, <code>ErrorRecord</code>, and test capture are in. The releases before 1.0 are for tuning, hardening, and migrating real crates. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
+        <strong>Status: beta (<code>0.9.1</code>): feature complete, measured, hardened, checked against real migrations, and in its pre-1.0 polish pass.</strong> <code>define_errors!</code> has thiserror parity and optional codes, a compile-time catalog, severity, categories, kinds, public messages, and retry advice. The reporting facade, <code>ErrorRecord</code>, and test capture are in. The releases before 1.0 are for tuning, hardening, and migrating real crates. The complete API is in <a href="./docs/API.md"><code>docs/API.md</code></a>, what the macro expands to in <a href="./docs/GENERATED-CODE.md"><code>docs/GENERATED-CODE.md</code></a>, the design in <a href="./dev/PLAN.md"><code>dev/PLAN.md</code></a>, and the schedule in <a href="./dev/ROADMAP.md"><code>dev/ROADMAP.md</code></a>.
     </blockquote>
 </div>
 
@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.9.0"
+define-err = "0.9.1"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.9.0", default-features = false }            # core only
-define-err = { version = "0.9.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.9.1", default-features = false }            # core only
+define-err = { version = "0.9.1", default-features = false, features = ["alloc"] }
 ```
 
 ## Quick start
