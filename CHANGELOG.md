@@ -13,6 +13,44 @@
 
 ---
 
+## [0.9.0] - 2026-11-08
+
+The beta. The first release of the pre-1.0 polish pass: the security
+re-run's one finding, a faster plain enum, and a test or a check for every
+requirement.
+
+### Fixed
+
+- A malformed `#[category]`, `#[severity]`, `#[kinds]`, `#[public]`,
+  `#[action]`, or `#[retryable]` is reported once. A malformed category used
+  to be reported seven times, once by each value that reads it.
+- A variant with two `#[from]` fields is reported once, as a variant with more
+  than one source field.
+- `#[code(4294967295, help = "...")]` is rejected as out of range. 0.8.0
+  took that number for the stand-in of a code with no number literal, so it
+  skipped the range check and the code read as a placeholder. `__private`:
+  `check_number` no longer skips `INVALID_NUMBER`; the block calls it only for
+  a code whose number is a literal.
+
+### Changed
+
+- A plain enum (no namespace, no metadata, every message a literal) expands
+  in one pass over its variants. The generated code is unchanged; a rebuild
+  of a 500-variant enum is 28% faster.
+
+### Added
+
+- `tools/invariants.py`, run by CI: no runtime dependency in any feature mode,
+  `unsafe` only in `src/facade/slot.rs` with a `SAFETY:` comment on every
+  line, the codes modules independent of the facade, a compile-fail case for
+  every message of `define_errors!`, and the size of `src`.
+- 23 compile-fail cases, one for each message that had none, and one showing
+  that a generated enum is `#[non_exhaustive]` in the crates that use it.
+- A property test for `short_file`: what it returns is always a suffix of
+  its input, and a relative path comes back unchanged.
+
+---
+
 ## [0.8.0] - 2026-11-05
 
 The alpha. Five crates in four repositories were migrated onto 0.7.0 as draft
@@ -378,7 +416,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jamesgober/define-err/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jamesgober/define-err/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jamesgober/define-err/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jamesgober/define-err/compare/v0.5.0...v0.6.0

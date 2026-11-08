@@ -25,7 +25,7 @@ No file depends on a crate outside `core`, `alloc`, and `std`.
 
 `define_errors!` is a declarative macro, so a build needs no proc macro and no build dependency.
 
-**Two paths.** A block is first matched by a non-recursive fast arm, which takes the common shapes in one step and reaches 500 variants under the default recursion limit. Anything else goes through a general path in continuation-passing style, one token group at a time, which handles every attribute and every field form. Both produce the same canonical form, so `emit.rs` has one input.
+**Two paths.** A block is first matched by a non-recursive fast arm, which takes the common shapes in one step and reaches 500 variants under the default recursion limit. Anything else goes through a general path in continuation-passing style, one token group at a time, which handles every attribute and every field form. Both produce the same canonical form, so `emit.rs` has one input. A plain enum (no namespace, no metadata, every message a literal) has a third arm ahead of both, which writes its items in one pass with no canonical form in between; it writes exactly what the fast path does (D-082).
 
 **The canonical form.** Each variant carries eight metadata slots and a ninth slot of `cfg` attributes. Each field is `{ [attrs] [vis] [cfg] role name : Type }`.
 

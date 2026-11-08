@@ -75,7 +75,8 @@ Exit: each migrated crate's CI is green on its own repository against the publis
 
 ## v0.9.0 - Beta and release candidates
 Exit: API unchanged across the last release candidate; L2 and L3 owners sign off on the contract; James's review below done.
-- [ ] Migrate noml-rust and mod-cli; config-lib's path decided with James (`PLAN.md` 19.4).
+- [x] `0.9.0` released, the first beta (2026-11-08, D-083): the security re-run's finding (D-081), the plain enum in one pass (D-082), the requirement map (D-078 to D-080).
+- [ ] Migrate noml-rust and mod-cli (draft PRs open); config-lib's path decided with James (`PLAN.md` 19.4).
 - [ ] L2 builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite; L3 reads codes through the probe.
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.
 - [ ] **Pre-1.0 polish pass**, in `0.9.x` and before any 1.0 release candidate (James's standing rule: go back and fix any issues and tune performance before getting close to release):
@@ -86,6 +87,8 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
   Nothing accepted earlier in the series becomes final silently: whatever is still open goes into the 1.0 readiness note for James.
 - [ ] Release candidates `0.9.x` until no API change is needed for two weeks of use.
 - [ ] `docs/STABILITY-1.0.md` drafted with the requirement-to-test map (`tests/TRACEABILITY.md`).
+  - [x] `tests/TRACEABILITY.md`: every FR and NFR mapped to named tests; the gaps it found are fixed (FR-6 from a second crate, D-079; NFR-1, NFR-8, NFR-12, NFR-14 and the module boundary checked by `tools/invariants.py`, D-080; 22 compile-fail cases added and each mistake reported once, D-078) (2026-11-06).
+  - [x] `dev/READINESS-1.0.md` started: James's decisions, the definition of done line by line, every open item.
 
 ## v1.0.0 - Stable
 Exit: `PLAN.md` section 16 complete and James approves.

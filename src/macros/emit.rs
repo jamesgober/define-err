@@ -39,6 +39,7 @@ macro_rules! __define_err_emit {
         )* ] }
 
         $( $crate::__define_err_code!(@check $ns [$($code)?]); )*
+        $( $crate::__define_err_value!(@check [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?]); )*
 
         $crate::__define_err_cfg! { [$($tattr)*] [] {
             $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [ $(
@@ -68,6 +69,7 @@ macro_rules! __define_err_emit {
         }
 
         $crate::__define_err_code!(@check $ns [$($code)?]);
+        $crate::__define_err_value!(@check [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$($retry)?]);
 
         $crate::__define_err_cfg! { [$($tattr)*] [] {
             $crate::__define_err_emit! { @impls [$ns $docs $rf] ($vis) $name [
@@ -414,6 +416,9 @@ macro_rules! __define_err_ns {
 macro_rules! __define_err_code {
     // Operations on a parsed code: [n] [name] [help] [title] [since] [replacement].
     (@do check [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {};
+    (@do range [$namespace:ident] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
+        $crate::__private::check_number($namespace, $n)
+    };
     (@do number [] [$n:literal] [$($cname:ident)?] [$help:literal] [$($title:literal)?] [$($since:literal)?] [$($rep:literal)?]) => {
         $n
     };
@@ -511,6 +516,7 @@ macro_rules! __define_err_code {
     // literal, the block's checks still see that number, so a real duplicate
     // is caught and nothing else is reported; without one they skip it.
     (@invalid check [$($n:literal)?] [$($message:tt)*]) => { ::core::compile_error! { $($message)* } };
+    (@invalid range [$($args:tt)*] [$($message:tt)*]) => {};
     (@invalid number [$n:literal] [$($message:tt)*]) => { $n };
     (@invalid number [] [$($message:tt)*]) => { $crate::__private::INVALID_NUMBER };
     (@invalid replacement [$($n:literal)?] [$($message:tt)*]) => { &[] };
@@ -558,9 +564,7 @@ macro_rules! __define_err_code {
 macro_rules! __define_err_value {
     (@category []) => { $crate::Category::Unknown };
     (@category [($name:ident)]) => { $crate::Category::$name };
-    (@category [$($x:tt)*]) => {
-        ::core::compile_error! { "define_errors!: `#[category]` takes one category name, for example `#[category(Unavailable)]`" }
-    };
+    (@category [$($x:tt)*]) => { $crate::Category::Unknown };
 
     (@severity [] [$($cat:tt)?]) => { $crate::Category::default_severity($crate::__define_err_value!(@category [$($cat)?])) };
     (@severity [($n:literal)] [$($cat:tt)?]) => { $crate::__private::severity::<$n>() };
@@ -569,9 +573,7 @@ macro_rules! __define_err_value {
         use $crate::__private::named_levels::*;
         $name
     }};
-    (@severity [$($x:tt)*] [$($cat:tt)?]) => {
-        ::core::compile_error! { "define_errors!: `#[severity]` takes a name (`CRITICAL`) or a number from 1 to 24" }
-    };
+    (@severity [$($x:tt)*] [$($cat:tt)?]) => { $crate::Category::default_severity($crate::Category::Unknown) };
 
     (@kinds []) => { $crate::Kinds::ERROR };
     (@kinds [($($kind:path)|+)]) => {{
@@ -579,29 +581,65 @@ macro_rules! __define_err_value {
         use $crate::__private::platform_kinds::*;
         $crate::Kinds::NONE $( .union($kind) )+
     }};
-    (@kinds [$($x:tt)*]) => {
-        ::core::compile_error! { "define_errors!: `#[kinds]` takes kinds joined by `|`, for example `#[kinds(ERROR | SECURITY)]`" }
-    };
+    (@kinds [$($x:tt)*]) => { $crate::Kinds::ERROR };
 
     (@public [] [$($cat:tt)?]) => { $crate::Category::default_public_message($crate::__define_err_value!(@category [$($cat)?])) };
     (@public [($text:literal)] [$($cat:tt)?]) => { $text };
-    (@public [$($x:tt)*] [$($cat:tt)?]) => {
-        ::core::compile_error! { "define_errors!: `#[public]` takes one string, for example `#[public(\"The service is busy.\")]`" }
-    };
+    (@public [$($x:tt)*] [$($cat:tt)?]) => { $crate::Category::default_public_message($crate::Category::Unknown) };
     (@probe_public []) => { ::core::option::Option::None };
     (@probe_public [($text:literal)]) => { ::core::option::Option::Some($text) };
     (@probe_public [$($x:tt)*]) => { ::core::option::Option::None };
 
     (@action [] [$($cat:tt)?]) => { $crate::Category::default_action($crate::__define_err_value!(@category [$($cat)?])) };
     (@action [($name:ident)] [$($cat:tt)?]) => { $crate::Action::$name };
-    (@action [$($x:tt)*] [$($cat:tt)?]) => {
-        ::core::compile_error! { "define_errors!: `#[action]` takes one action name, for example `#[action(FixConfig)]`" }
-    };
+    (@action [$($x:tt)*] [$($cat:tt)?]) => { $crate::Category::default_action($crate::Category::Unknown) };
 
     (@retryable [] [$($cat:tt)?]) => { $crate::Category::is_transient($crate::__define_err_value!(@category [$($cat)?])) };
     (@retryable [()] [$($cat:tt)?]) => { true };
     (@retryable [(($value:literal))] [$($cat:tt)?]) => { $value };
-    (@retryable [$($x:tt)*] [$($cat:tt)?]) => {
+    (@retryable [$($x:tt)*] [$($cat:tt)?]) => { false };
+
+    // The one place a malformed value is reported; the readers above fall
+    // back to the default, so the user sees one message per mistake.
+    (@check [] [] [] [] [] []) => {};
+    (@check [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?]) => {
+        $crate::__define_err_value!(@check_category [$($cat)?]);
+        $crate::__define_err_value!(@check_severity [$($sev)?]);
+        $crate::__define_err_value!(@check_kinds [$($kinds)?]);
+        $crate::__define_err_value!(@check_public [$($public)?]);
+        $crate::__define_err_value!(@check_action [$($action)?]);
+        $crate::__define_err_value!(@check_retryable [$($retry)?]);
+    };
+    (@check_category []) => {};
+    (@check_category [($name:ident)]) => {};
+    (@check_category [$($x:tt)*]) => {
+        ::core::compile_error! { "define_errors!: `#[category]` takes one category name, for example `#[category(Unavailable)]`" }
+    };
+    (@check_severity []) => {};
+    (@check_severity [($n:literal)]) => {};
+    (@check_severity [($name:ident)]) => {};
+    (@check_severity [$($x:tt)*]) => {
+        ::core::compile_error! { "define_errors!: `#[severity]` takes a name (`CRITICAL`) or a number from 1 to 24" }
+    };
+    (@check_kinds []) => {};
+    (@check_kinds [($($kind:path)|+)]) => {};
+    (@check_kinds [$($x:tt)*]) => {
+        ::core::compile_error! { "define_errors!: `#[kinds]` takes kinds joined by `|`, for example `#[kinds(ERROR | SECURITY)]`" }
+    };
+    (@check_public []) => {};
+    (@check_public [($text:literal)]) => {};
+    (@check_public [$($x:tt)*]) => {
+        ::core::compile_error! { "define_errors!: `#[public]` takes one string, for example `#[public(\"The service is busy.\")]`" }
+    };
+    (@check_action []) => {};
+    (@check_action [($name:ident)]) => {};
+    (@check_action [$($x:tt)*]) => {
+        ::core::compile_error! { "define_errors!: `#[action]` takes one action name, for example `#[action(FixConfig)]`" }
+    };
+    (@check_retryable []) => {};
+    (@check_retryable [()]) => {};
+    (@check_retryable [(($value:literal))]) => {};
+    (@check_retryable [$($x:tt)*]) => {
         ::core::compile_error! { "define_errors!: write `#[retryable]`, `#[retryable(true)]`, or `#[retryable(false)]`" }
     };
 
@@ -877,9 +915,9 @@ macro_rules! __define_err_from {
     (@scan $name:ident [$($path:tt)*] $v:ident tuple [] [$($init:tt)*] [$($other:tt)*] from $n:ident : $t:ty ; $($rest:tt)*) => {
         $crate::__define_err_from! { @scan $name [$($path)*] $v tuple [$t] [$($init)* $v,] [$($other)*] $($rest)* }
     };
-    (@scan $name:ident [$($path:tt)*] $v:ident $kind:ident [$($from:tt)+] [$($init:tt)*] [$($other:tt)*] from $n:ident : $t:ty ; $($rest:tt)*) => {
-        ::core::compile_error! { "define_errors!: a variant has more than one `#[from]` field" }
-    };
+    // A second `#[from]` is a second source field, which the source check
+    // reports; no `From` impl is generated for the variant.
+    (@scan $name:ident [$($path:tt)*] $v:ident $kind:ident [$($from:tt)+] [$($init:tt)*] [$($other:tt)*] from $n:ident : $t:ty ; $($rest:tt)*) => {};
     (@scan $name:ident [$($path:tt)*] $v:ident braced [$($from:tt)*] [$($init:tt)*] [$($other:tt)*] location $n:ident : $t:ty ; $($rest:tt)*) => {
         $crate::__define_err_from! { @scan $name [$($path)*] $v braced [$($from)*] [$($init)* $n: ::core::panic::Location::caller(),] [$($other)*] $($rest)* }
     };
