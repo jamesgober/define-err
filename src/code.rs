@@ -522,32 +522,41 @@ impl core::hash::Hash for Code {
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Each character and each digit is computed from the whole value
+        // rather than by repeated division, so none waits on the one before
+        // it (D-084).
         let namespace = self.namespace();
-        let name = namespace.as_str();
-        // At most eight digits: a number fits 24 bits.
-        let mut digits = [b'0'; 8];
-        let mut first = digits.len() - usize::from(namespace.width);
-        let mut number = self.number();
-        for (index, digit) in digits.iter_mut().enumerate().rev() {
-            if number == 0 {
-                break;
-            }
-            *digit = b'0' + (number % 10) as u8;
-            number /= 10;
-            first = first.min(index);
-        }
-        let shown = &digits[first..];
         let mut text = [b'-'; MAX_TEXT];
-        let (head, tail) = text.split_at_mut(usize::from(name.len) + 1);
-        head[..usize::from(name.len)].copy_from_slice(&name.bytes[..usize::from(name.len)]);
-        tail[..shown.len()].copy_from_slice(shown);
-        let len = head.len() + shown.len();
-        match core::str::from_utf8(&text[..len]) {
+        let mut len = 0;
+        for (slot, power) in text.iter_mut().zip(NAME_POWERS) {
+            let value = namespace.field / power % 37;
+            if value != 0 {
+                *slot = value_char(value);
+                len += 1;
+            }
+        }
+        // At most eight digits: a number fits 24 bits.
+        let number = self.number();
+        let mut digits = [b'0'; 8];
+        for (digit, ten) in digits.iter_mut().zip(DIGIT_POWERS) {
+            *digit = b'0' + (number / ten % 10) as u8;
+        }
+        let significant = DIGIT_POWERS.iter().filter(|&&ten| number >= ten).count();
+        let shown = significant.max(usize::from(namespace.width));
+        let end = len + 1 + shown;
+        text[len + 1..end].copy_from_slice(&digits[digits.len() - shown..]);
+        match core::str::from_utf8(&text[..end]) {
             Ok(text) => f.write_str(text),
             Err(_) => Err(fmt::Error),
         }
     }
 }
+
+/// 37 to the powers 5 down to 0: the place of each namespace character.
+const NAME_POWERS: [u32; 6] = [69_343_957, 1_874_161, 50_653, 1_369, 37, 1];
+
+/// 10 to the powers 7 down to 0: the place of each digit.
+const DIGIT_POWERS: [u32; 8] = [10_000_000, 1_000_000, 100_000, 10_000, 1_000, 100, 10, 1];
 
 impl fmt::Debug for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

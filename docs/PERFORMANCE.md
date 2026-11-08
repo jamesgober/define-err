@@ -55,7 +55,7 @@ python tools/build-time/compare.py --runs 10
 | `Display` of a generated variant | within 2% of thiserror | | 120.3 ns | thiserror 120.4 ns, hand-written 120.9 ns | **met** |
 | `size_of` of a generated type | equal to hand-written | | | | **met**: asserted in `tests/traits.rs` |
 | `code()` and other `ErrorInfo` methods | under 1 ns | 0.24 ns | 0.5 to 0.7 ns | error-forge 0.4 to 0.6 ns | **met** |
-| `Code` `Display` | under 20 ns, no allocation | 28 ns | 39 ns | error-forge `format!` 81 ns, allocates | **missed**; no allocation met |
+| `Code` `Display` | under 20 ns, no allocation | 24 ns | 39 ns (0.8) | error-forge `format!` 81 ns, allocates | **missed**; no allocation met |
 | `Code::parse` | under 15 ns, 20% faster than a `String` lookup | 8.7 ns | 12 ns | error-forge registry 75 ns | **met** |
 | catalog lookup by code | constant | | 0.6 ns, `catalog::find` 2.4 ns | error-forge registry 75 ns | **met** |
 | verb with nothing installed | one load, under 1 ns | 0.27 to 0.51 ns | 0.35 to 0.68 ns | | **met** |
@@ -129,6 +129,8 @@ A plain enum (no namespace, no metadata, every message a literal) is written in 
 
 Types with a namespace or metadata keep the general passes. Nothing changes at run time.
 
+0.9.1 computes each character and digit of a `Code`'s text from the whole value, where 0.9.0 divided by 37, then by 10, one step after another (D-084). The text is the same, checked against `std` formatting by a property test. `benches/floor.rs` code_display, the two versions alternated for four rounds at a load average of 60: 25.7 to 26.8 ns before, 23.3 to 23.9 ns after, about 10% less. For scale, on the same runs: `write!` of the seven-byte `&str` `"DB-0001"` 10.5 ns, of a four-digit `u32` 15.4 ns; the same `Display` without its `str::from_utf8` 19.6 to 20.2 ns. A 16-byte aligned buffer, which lets `from_utf8` check a word at a time, saved under 1 ns more and was not kept.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.
@@ -183,7 +185,7 @@ Each has a reviewed reason (D-060 in `dev/PLAN.md`) and goes back on the list in
 | Target | Result | Why it stands |
 |---|---|---|
 | verb 20% faster than `log` at `Off` | parity | Both are one load and a branch. There is nothing left to remove. |
-| `Code` `Display` under 20 ns | 28 ns | `str::from_utf8` is the one safe way to a `&str`, and `unsafe` stays in one module. Half the cost of the `format!` it replaces, with no allocation. |
+| `Code` `Display` under 20 ns | 24 ns | `write!` of a seven-byte `&str` alone costs 10.5 ns on this machine, and `str::from_utf8` of the text 4.5 ns more. Without that check it reads 20 ns, and `unsafe` stays in one module. Under half the cost of the `format!` it replaces, with no allocation. |
 | `warn()` under 5 ns | 7.0 ns | A function has no per-site static, so the site is found by hashing its file, line, and column. The key is by content because the compiler may emit one location twice. `warn!` is exact and costs 0.5 ns, and is the one to use in a hot loop. |
 | `report` filtered under 3 ns | 5.7 ns | A call, the panic guard, and a virtual call come before the two digits it reads. `report_with` knows its severity and costs 0.64 ns. |
 | `identify` generated under 10 ns | 26 ns | The probe is text from a `&dyn Error` that may be hostile, so every field is validated: 38 hex digits, the code's layout, severity and category ranges, every byte of the name. |

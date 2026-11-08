@@ -29,6 +29,14 @@ proptest! {
     }
 
     #[test]
+    fn prop_code_display_matches_std_formatting(code in any_code()) {
+        let namespace = code.namespace();
+        let width = usize::from(namespace.width());
+        let expected = format!("{}-{:0width$}", &*namespace.as_str(), code.number());
+        prop_assert_eq!(code.to_string(), expected);
+    }
+
+    #[test]
     fn prop_code_order_is_namespace_then_number(a in any_code(), b in any_code()) {
         let key = |c: Code| (c.namespace().as_str().to_string(), c.number());
         prop_assert_eq!(a.cmp(&b), key(a).cmp(&key(b)));

@@ -11,6 +11,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `Code`'s `Display` is about 10% faster: each character and digit is
+  computed on its own instead of by repeated division. The text is
+  unchanged.
+
 ---
 
 ## [0.9.0] - 2026-11-08
