@@ -16,6 +16,9 @@
 - `Code`'s `Display` is about 10% faster: each character and digit is
   computed on its own instead of by repeated division. The text is
   unchanged.
+- `ChainEntry::has_control` is found eight bytes at a time: about four
+  times faster on a message of a hundred bytes or more. It means what it
+  meant.
 
 ---
 

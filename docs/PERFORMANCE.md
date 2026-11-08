@@ -131,6 +131,17 @@ Types with a namespace or metadata keep the general passes. Nothing changes at r
 
 0.9.1 computes each character and digit of a `Code`'s text from the whole value, where 0.9.0 divided by 37, then by 10, one step after another (D-084). The text is the same, checked against `std` formatting by a property test. `benches/floor.rs` code_display, the two versions alternated for four rounds at a load average of 60: 25.7 to 26.8 ns before, 23.3 to 23.9 ns after, about 10% less. For scale, on the same runs: `write!` of the seven-byte `&str` `"DB-0001"` 10.5 ns, of a four-digit `u32` 15.4 ns; the same `Display` without its `str::from_utf8` 19.6 to 20.2 ns. A 16-byte aligned buffer, which lets `from_utf8` check a word at a time, saved under 1 ns more and was not kept.
 
+0.9.1 also scans a record's chain message for control characters eight bytes at a time (D-085). Its budget in `dev/PLAN.md` 10.2 is 1 ns per 16 bytes; `chars().any(char::is_control)` took 6 to 10. Floors at a load average of 60:
+
+| Message | 0.9.0 | 0.9.1 |
+|---|---|---|
+| 29 bytes, ASCII | 11.6 ns | 8.2 ns |
+| 132 bytes, ASCII | 49 ns | 10.8 ns (1.3 ns per 16 bytes) |
+| 115 bytes, with umlauts | 43 ns | 11.2 ns |
+| 21 bytes, a newline at byte 9 | 4.3 ns | 7.0 ns |
+
+The last row is slower because the old scan stopped at the first control character and the new one reads the whole message.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.
