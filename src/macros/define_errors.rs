@@ -1,18 +1,20 @@
 //! `define_errors!`: the entry point and the parser.
 //!
-//! The parser has two paths that end in the same emitter (`emit.rs`):
+//! Every path ends in the same emitter (`emit.rs`), which reads one
+//! canonical form. Results can only be gathered by passing them along a chain
+//! of calls, and each link adds one to the depth `recursion_limit` caps, so
+//! an enum is read in chunks (D-087):
 //!
-//! - **Fast path.** One arm matches a whole enum written in the canonical
-//!   order (on variants: doc comments, then the metadata attributes in the
-//!   order `code`, `category`, `severity`, `kinds`, `public`, `action`,
-//!   `retryable`, `retry_after`; on fields: doc comments, then at most one
-//!   marker right before the name; tuple fields named) and hands every
-//!   variant to the emitter through repetitions. It does not recurse, so an
-//!   enum of any size compiles at the default `recursion_limit`.
-//! - **General path.** Anything else (lint attributes, attributes in other
-//!   orders, unnamed tuple fields, structs) is normalised one variant at a
-//!   time. A variant already in canonical form costs one step; an irregular
-//!   one costs one step per attribute and field.
+//! - **Split.** One step turns the body into one token group per variant.
+//! - **Chunks.** Each step reads 32 groups with one arm. Inside each `#[...]`
+//!   the arm matches the attribute by its first word, so variant attributes
+//!   may come in any order; fields are doc comments, then at most one marker
+//!   right before the name. Unnamed tuple fields are named first, by a step
+//!   that rewrites the chunk. A chunk the arm cannot read is retried one
+//!   variant at a time.
+//! - **Munching.** A variant no chunk arm reads, and every struct, is
+//!   normalised one attribute or field per step. This is where malformed
+//!   input is reported.
 //!
 //! Matching rules that shape the patterns: a `tt`, `ident`, or `vis` fragment
 //! may never compete with a literal token at the same position (rustc reports
@@ -20,6 +22,9 @@
 //! `:`, `;`, `=`, `|`, `>`, `{`, `[`, `as`, or `where`. Every slot below is
 //! therefore led by a literal token (`#[doc`, `#[code`, `#[from]`, ...), and
 //! field markers capture the field name, with the type in one shared tail.
+//! In the rewriting step a field marker, matched by its first word, carries a
+//! `$(@ $x:tt)?` that valid input never fills: it gives the transcriber a
+//! variable to repeat on, so the marker is written back only when present.
 //!
 //! Every type of a block is emitted in turn, and each passes the block's
 //! context to the next: `[[namespace] [docs] [retired] [retired, for this
@@ -282,7 +287,7 @@ macro_rules! __define_err_type {
         $crate::__define_err_type! { @attrs [$($ctx)*] [$($acc)* #[$($attr)*]] [$($debug)*] [$($ne)*] [$($ex)*] [$($meta)*] $($rest)* }
     };
 
-    // An enum: try the fast path, then the general path. Metadata belongs on
+    // An enum: the plain arm, then the chunks, then munching. Metadata belongs on
     // its variants.
     (@attrs [$($ctx:tt)*] [$($acc:tt)*] [$($debug:tt)*] [$($ne:tt)*] [$($ex:tt)*] [[] [] [] [] [] [] [] []]
         $vis:vis enum $name:ident { $($body:tt)* } $($rest:tt)*) => {
@@ -361,6 +366,12 @@ macro_rules! __define_err_meta_slot {
     (@set retry_after $a:tt; [$s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt $s7:tt [] $($s:tt)*]; $m:ident @$st:ident $($state:tt)*) => {
         $crate::__define_err_meta_slot! { @back $m @$st [$s1 $s2 $s3 $s4 $s5 $s6 $s7 [$a] $($s)*] $($state)* }
     };
+    // Eight slots, each holding at most one value, or the written-twice error.
+    (@once $([$($value:tt)?])*) => {};
+    (@once $($slot:tt)*) => {
+        $crate::__define_err_meta_slot! { @set }
+    };
+
     (@set code; $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: `#[code]` needs a number and help text, for example `#[code(1, help = \"Raise pool.size.\")]`" }
     };
@@ -494,18 +505,62 @@ macro_rules! __define_err_enum {
         }
     };
 
-    // Fast path: the whole enum in canonical form, in one non-recursive arm.
+    // Every other enum, in two stages (D-087). Stage one splits the body into
+    // one group per variant, in one step. A body that does not split this way
+    // goes to the munching parser, which reports the mistake.
     (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $(
-        $(#[doc $($doc:tt)*])*
-        $(#[cfg $cfg:tt])*
-        $(#[code $code:tt])?
-        $(#[category $cat:tt])?
-        $(#[severity $sev:tt])?
-        $(#[kinds $kinds:tt])?
-        $(#[public $public:tt])?
-        $(#[action $action:tt])?
-        $(#[retryable $($retry:tt)?])?
-        $(#[retry_after $ra:tt])?
+        $(#$attr:tt)* $vn:ident $({ $($braced:tt)* })? $(( $($tuple:tt)* ))? => $msg:tt
+    ),* $(,)? }) => {
+        $crate::__define_err_enum! { @take [[$($ctx)*] [$($tattr)*] ($vis) $name] [] $(
+            ( $(#$attr)* $vn $({ $($braced)* })? $(( $($tuple)* ))? => $msg )
+        )* }
+    };
+    (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $($body:tt)* }) => {
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [] [] [[] [] [] [] [] [] [] [] []] $($body)* }
+    };
+
+    // Stage two reads 32 groups per step, so the depth of the expansion grows
+    // by one step per 32 variants, not by one or more per variant (NFR-6).
+    // State: `@take [ctx tattr vis name] [canonical variants so far] groups`.
+    (@take $env:tt $acc:tt
+        $g0:tt $g1:tt $g2:tt $g3:tt $g4:tt $g5:tt $g6:tt $g7:tt $g8:tt $g9:tt $g10:tt $g11:tt $g12:tt $g13:tt $g14:tt $g15:tt
+        $g16:tt $g17:tt $g18:tt $g19:tt $g20:tt $g21:tt $g22:tt $g23:tt $g24:tt $g25:tt $g26:tt $g27:tt $g28:tt $g29:tt $g30:tt $g31:tt
+        $($rest:tt)*) => {
+        $crate::__define_err_enum! { @chunk $env $acc [take] []
+            $g0 $g1 $g2 $g3 $g4 $g5 $g6 $g7 $g8 $g9 $g10 $g11 $g12 $g13 $g14 $g15
+            $g16 $g17 $g18 $g19 $g20 $g21 $g22 $g23 $g24 $g25 $g26 $g27 $g28 $g29 $g30 $g31 ; $($rest)* }
+    };
+    (@take $env:tt $acc:tt $($g:tt)+) => {
+        $crate::__define_err_enum! { @chunk $env $acc [take] [] $($g)+ ; }
+    };
+    (@take [[$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident] [$($acc:tt)*]) => {
+        $crate::__define_err_emit! { @enum [$($ctx)*] [$($tattr)*] ($vis) $name [$($acc)*] }
+    };
+
+    // A chunk of variants whose fields are named, each attribute matched by
+    // its leading word inside `#[...]`, so variant attributes may come in any
+    // order. Writes each variant in the canonical form `emit.rs` reads. A
+    // metadata attribute written twice lands in its slot twice; `@enum`
+    // reports it.
+    (@chunk $env:tt [$($acc:tt)*] [$cont:ident] $conv:tt $( (
+        $( # [
+            $(doc $($doc:tt)*)?
+            $(cfg $cfg:tt)?
+            $(code $code:tt)?
+            $(category $cat:tt)?
+            $(severity $sev:tt)?
+            $(kinds $kinds:tt)?
+            $(public $public:tt)?
+            $(action $action:tt)?
+            $(retryable $($retry:tt)?)?
+            $(retry_after $ra:tt)?
+            $(allow $($allow:tt)*)?
+            $(warn $($warn:tt)*)?
+            $(deny $($deny:tt)*)?
+            $(forbid $($forbid:tt)*)?
+            $(expect $($expect:tt)*)?
+            $(deprecated $($dep:tt)*)?
+        ] )*
         $vn:ident
         $({ $(
             $(#[doc $($bdoc:tt)*])*
@@ -526,22 +581,67 @@ macro_rules! __define_err_enum {
             : $tty:ty
         ),* $(,)? ))?
         => $msg:tt
-    ),* $(,)? }) => {
-        $crate::__define_err_emit! { @enum [$($ctx)*] [$($tattr)*] ($vis) $name [ $(
-            ( [$(#[doc $($doc)*])*]
-              [$($code)?] [$($cat)?] [$($sev)?] [$($kinds)?] [$($public)?] [$($action)?] [$( ( $($retry)? ) )?] [$($ra)?] [$(#[cfg $cfg])*]
+    ) )* ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @$cont $env [$($acc)* $(
+            ( [$( $(#[doc $($doc)*])? $(#[allow $($allow)*])? $(#[warn $($warn)*])? $(#[deny $($deny)*])?
+                  $(#[forbid $($forbid)*])? $(#[expect $($expect)*])? $(#[deprecated $($dep)*])? )*]
+              [$( $($code)? )*] [$( $($cat)? )*] [$( $($sev)? )*] [$( $($kinds)? )*] [$( $($public)? )*] [$( $($action)? )*]
+              [$( $( ( $($retry)? ) )? )*] [$( $($ra)? )*] [$( $(#[cfg $cfg])? )*]
               $vn
               $({ $( { [$(#[doc $($bdoc)*])*] [] []
                   $(from $bfrom)? $(source $bsrc)? $(location $bloc)? $(retry_after $bra)? $(plain $bplain)? : $bty } )* })?
               $(( $( { [$(#[doc $($tdoc)*])*] [] []
                   $(from $tfrom)? $(source $tsrc)? $(location $tloc)? $(retry_after $tra)? $(plain $tplain)? : $tty } )* ))?
               => $msg )
-        )* ] }
+        )*] $($rest)* }
     };
 
-    // General path.
-    (@start [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident { $($body:tt)* }) => {
-        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [] [] [[] [] [] [] [] [] [] [] []] $($body)* }
+    // A chunk with unnamed tuple fields (`Io(#[from] io::Error)`, up to six
+    // per variant): name field N `__define_err_N`, as the munching parser
+    // does, then read the chunk again. Once per chunk.
+    (@chunk $env:tt $acc:tt [$cont:ident] [] $( (
+        $(#$attr:tt)* $vn:ident $({ $($braced:tt)* })?
+        $(( $(
+            $(#[doc $($d0:tt)*])* $( # [ $(from $(@ $f0:tt)?)? $(source $(@ $s0:tt)?)? $(location $(@ $l0:tt)?)? $(retry_after $(@ $r0:tt)?)? ] )? $t0:ty
+            $(, $(#[doc $($d1:tt)*])* $( # [ $(from $(@ $f1:tt)?)? $(source $(@ $s1:tt)?)? $(location $(@ $l1:tt)?)? $(retry_after $(@ $r1:tt)?)? ] )? $t1:ty
+            $(, $(#[doc $($d2:tt)*])* $( # [ $(from $(@ $f2:tt)?)? $(source $(@ $s2:tt)?)? $(location $(@ $l2:tt)?)? $(retry_after $(@ $r2:tt)?)? ] )? $t2:ty
+            $(, $(#[doc $($d3:tt)*])* $( # [ $(from $(@ $f3:tt)?)? $(source $(@ $s3:tt)?)? $(location $(@ $l3:tt)?)? $(retry_after $(@ $r3:tt)?)? ] )? $t3:ty
+            $(, $(#[doc $($d4:tt)*])* $( # [ $(from $(@ $f4:tt)?)? $(source $(@ $s4:tt)?)? $(location $(@ $l4:tt)?)? $(retry_after $(@ $r4:tt)?)? ] )? $t4:ty
+            $(, $(#[doc $($d5:tt)*])* $( # [ $(from $(@ $f5:tt)?)? $(source $(@ $s5:tt)?)? $(location $(@ $l5:tt)?)? $(retry_after $(@ $r5:tt)?)? ] )? $t5:ty
+            )?)?)?)?)?
+        )? $(,)? ))?
+        => $msg:tt
+    ) )* ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @chunk $env $acc [$cont] [named] $(
+            ( $(#$attr)* $vn $({ $($braced)* })?
+              $(( $(
+                  $(#[doc $($d0)*])* $( # [ $(from $(@ $f0)?)? $(source $(@ $s0)?)? $(location $(@ $l0)?)? $(retry_after $(@ $r0)?)? ] )? __define_err_0 : $t0,
+                  $( $(#[doc $($d1)*])* $( # [ $(from $(@ $f1)?)? $(source $(@ $s1)?)? $(location $(@ $l1)?)? $(retry_after $(@ $r1)?)? ] )? __define_err_1 : $t1,
+                  $( $(#[doc $($d2)*])* $( # [ $(from $(@ $f2)?)? $(source $(@ $s2)?)? $(location $(@ $l2)?)? $(retry_after $(@ $r2)?)? ] )? __define_err_2 : $t2,
+                  $( $(#[doc $($d3)*])* $( # [ $(from $(@ $f3)?)? $(source $(@ $s3)?)? $(location $(@ $l3)?)? $(retry_after $(@ $r3)?)? ] )? __define_err_3 : $t3,
+                  $( $(#[doc $($d4)*])* $( # [ $(from $(@ $f4)?)? $(source $(@ $s4)?)? $(location $(@ $l4)?)? $(retry_after $(@ $r4)?)? ] )? __define_err_4 : $t4,
+                  $( $(#[doc $($d5)*])* $( # [ $(from $(@ $f5)?)? $(source $(@ $s5)?)? $(location $(@ $l5)?)? $(retry_after $(@ $r5)?)? ] )? __define_err_5 : $t5,
+                  )?)?)?)?)?
+              )? ))?
+              => $msg )
+        )* ; $($rest)* }
+    };
+
+    // A chunk neither arm read: its variants one at a time.
+    (@chunk $env:tt $acc:tt [take] $conv:tt $( ( $($g:tt)* ) )* ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @single $env $acc $( ( $($g)* ) )* ; $($rest)* }
+    };
+    // One variant neither arm read: the munching parser reads it, or reports
+    // what is wrong with it, then hands back with `@resume`.
+    (@chunk [[$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident] [$($acc:tt)*] [single] $conv:tt ( $($g:tt)* ) ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @v [$($ctx)*] [$($tattr)*] ($vis) $name [] [] [[] [] [] [] [] [] [] [] []]
+            $($g)* , @resume [[$($ctx)*] [$($tattr)*] ($vis) $name] [$($acc)*] $($rest)* }
+    };
+    (@single $env:tt $acc:tt ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @take $env $acc $($rest)* }
+    };
+    (@single $env:tt $acc:tt $first:tt $( ( $($g:tt)* ) )* ; $($rest:tt)*) => {
+        $crate::__define_err_enum! { @chunk $env $acc [single] [] $first ; $( ( $($g)* ) )* ; $($rest)* }
     };
 
     // All variants read: emit.
@@ -550,6 +650,11 @@ macro_rules! __define_err_enum {
     };
     (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [$($va:tt)*] [$($meta:tt)*]) => {
         ::core::compile_error! { "define_errors!: attributes at the end of an enum belong to no variant" }
+    };
+    // One variant read for stage two: back to it.
+    (@v [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [$($acc:tt)*] [] [[] [] [] [] [] [] [] [] []]
+        @resume $env:tt [$($prev:tt)*] $($rest:tt)*) => {
+        $crate::__define_err_enum! { @single $env [$($prev)* $($acc)*] $($rest)* }
     };
 
     // One variant already in canonical form: one step.
@@ -761,30 +866,29 @@ macro_rules! __define_err_fields {
         ::core::compile_error! { "define_errors!: `#[cfg]` works on plain fields; a field marked `#[from]`, `#[source]`, `#[location]`, or `#[retry_after]` cannot be compiled out" }
     };
 
-    // An unnamed tuple field: sources, locations, and retry delays get a
-    // fixed name (a variant has at most one of each); other fields take the
-    // next of the 16 names the caller passed in.
-    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [from] [] [$($pool:tt)*]
+    // An unnamed tuple field takes the next of the 16 names the caller passed
+    // in, `__define_err_0` for the first field, whatever its marker.
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [from] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] from __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] from $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
-    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [source] [] [$($pool:tt)*]
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [source] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] source __define_err_source : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] source $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
-    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [location] [] [$($pool:tt)*]
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [location] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] location __define_err_location : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] location $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
-    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [retry_after] [] [$($pool:tt)*]
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [retry_after] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
-        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] retry_after __define_err_retry_after : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
+        $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] retry_after $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
     (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] [$next:ident $($pool:tt)*]
         $fv:vis $t:ty $(, $($rest:tt)*)?) => {
         $crate::__define_err_fields! { @f tuple [$($cont)*] [$($done)* { [$($fa)*] [$fv] [] plain $next : $t }] [] [] [] [$($pool)*] $($($rest)*)? }
     };
-    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [] [] []
+    (@f tuple [$($cont:tt)*] [$($done:tt)*] [$($fa:tt)*] [$($role:tt)*] [] []
         $($rest:tt)+) => {
         ::core::compile_error! { "define_errors!: a tuple variant has more than 16 unnamed fields; name them (`binding: Type`) or use a braced variant" }
     };

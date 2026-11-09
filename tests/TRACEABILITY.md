@@ -37,7 +37,7 @@ Each requirement of `dev/PLAN.md` section 5 and the tests that check it (definit
 | NFR-3 no allocation outside the record | `alloc_free.rs::test_construction_display_source_info_allocate_nothing`, `alloc_free.rs::test_verbs_allocate_nothing`, `alloc_free.rs::test_record_allocation_count` | |
 | NFR-4 facade with nothing installed | `benches/facade.rs`, `benches/floor.rs`, `tools/asm` | By benchmark and assembly, not in CI. |
 | NFR-5 clean build faster than thiserror | `tools/build-time/compare.py` | By measurement, not in CI. |
-| NFR-6 500 variants at the default `recursion_limit` | `big_enum.rs::test_big_enum_first_and_last_variants` | |
+| NFR-6 500 variants at the default `recursion_limit` | `big_enum.rs::test_big_enum_first_and_last_variants` (canonical forms), `big_enum_any_order.rs::test_any_order_enum_first_and_last_variants` (attributes in any order, unnamed tuple fields) | |
 | NFR-7 no run-time panic | `#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, ...))]` in `src/lib.rs`, CI `test` job (Clippy, `-D warnings`) | |
 | NFR-8 `unsafe` in one module, under 40 lines | `#![deny(unsafe_code)]` in `src/lib.rs`, `tools/invariants.py`, CI `miri` and `loom` jobs | |
 | NFR-9 `Send + Sync` | `traits.rs::test_generated_types_are_send_sync_unpin`, `traits.rs::test_auto_traits_follow_fields`, `record.rs::test_record_is_send_sync_clone` | |
@@ -45,4 +45,4 @@ Each requirement of `dev/PLAN.md` section 5 and the tests that check it (definit
 | NFR-11 `no_std` targets | CI `no-std` job (thumbv7em, thumbv6m, riscv32imac, wasm32) | |
 | NFR-12 a compile-fail case per error path | `tools/invariants.py`, CI `ui` job | |
 | NFR-13 API fits one page per module | the 1.0 audit (`docs/STABILITY-1.0.md`) | A review, not a test. |
-| NFR-14 source size | `tools/invariants.py` | 5,351 lines of code, over the 5,000 target (D-080). |
+| NFR-14 source size | `tools/invariants.py` | 5,445 lines of code, over the 5,000 target (D-080, D-087). |
