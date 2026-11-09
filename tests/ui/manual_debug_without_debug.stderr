@@ -15,9 +15,9 @@ note: required by a bound in `std::error::Error`
 help: consider annotating `E` with `#[derive(Debug)]`
  --> src/macros/emit.rs
   |
-   +         #[derive(Debug)]
-   |         $vis enum $name { $(
-   |
+    +         #[derive(Debug)]
+    |         $vis enum $name { $(
+    |
 
 error[E0277]: `E` doesn't implement `std::fmt::Debug`
  --> tests/ui/manual_debug_without_debug.rs:3:1
@@ -51,6 +51,6 @@ note: required by a bound in `ErrorInfo`
 help: consider annotating `E` with `#[derive(Debug)]`
  --> src/macros/emit.rs
   |
-   +         #[derive(Debug)]
-   |         $vis enum $name { $(
-   |
+    +         #[derive(Debug)]
+    |         $vis enum $name { $(
+    |

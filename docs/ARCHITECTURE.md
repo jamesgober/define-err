@@ -25,7 +25,13 @@ No file depends on a crate outside `core`, `alloc`, and `std`.
 
 `define_errors!` is a declarative macro, so a build needs no proc macro and no build dependency.
 
-**Two paths.** A block is first matched by a non-recursive fast arm, which takes the common shapes in one step and reaches 500 variants under the default recursion limit. Anything else goes through a general path in continuation-passing style, one token group at a time, which handles every attribute and every field form. Both produce the same canonical form, so `emit.rs` has one input. A plain enum (no namespace, no metadata, every message a literal) has a third arm ahead of both, which writes its items in one pass with no canonical form in between; it writes exactly what the fast path does (D-082).
+**How an enum is read (D-087).** A `macro_rules!` macro can gather results only by passing them along a chain of calls, and every link adds one to the expansion depth that `recursion_limit` caps. So the enum parser keeps the chain short:
+
+1. One step splits the body into one token group per variant.
+2. Each later step reads 32 groups with a single arm. Inside every `#[...]` the arm matches the attribute by its first word, so variant attributes may come in any order. Unnamed tuple fields are first given names (`__define_err_0`, ...) by a step that rewrites the 32 groups, then read the same way. A 500-variant enum compiles with `recursion_limit` set as low as 56 to 72, depending on its forms; the default is 128.
+3. A chunk the arm cannot read is retried one variant at a time, and a variant it still cannot read goes to the munching parser, which normalises one attribute or field per step and reports any mistake with a message naming the fix. Structs always take that parser; they are one variant.
+
+Every path produces the same canonical form, so `emit.rs` has one input. A plain enum (no namespace, no metadata, every message a literal) has an arm ahead of all of them, which writes its items in one pass with no canonical form in between; it writes exactly what the general path does (D-082).
 
 **The canonical form.** Each variant carries eight metadata slots and a ninth slot of `cfg` attributes. Each field is `{ [attrs] [vis] [cfg] role name : Type }`.
 
