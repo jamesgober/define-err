@@ -56,6 +56,26 @@ macro_rules! __define_err_emit {
         }
     };
 
+    // A list `@enum` did not take: a metadata attribute written twice on one
+    // variant (the enum parser collects attributes in any order), or a
+    // malformed field. Each variant is checked on its own, so each mistake is
+    // reported once.
+    (@enum [$($ctx:tt)*] [$($tattr:tt)*] ($vis:vis) $name:ident [ $( $variant:tt )* ]) => {
+        $( $crate::__define_err_emit! { @variant $variant } )*
+    };
+    (@variant ( [$($vattr:tt)*]
+          [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?] $vcfg:tt
+          $vn:ident
+          $({ $( { [$($fattr:tt)*] [$($fvis:tt)*] [$($fcfg:tt)*] $frole:ident $fname:ident : $fty:ty } )* })?
+          $(( $( { [$($xattr:tt)*] [$($xvis:tt)*] [$($xcfg:tt)*] $xrole:ident $xname:ident : $xty:ty } )* ))?
+          => $msg:tt )) => {};
+    (@variant ( $vattr:tt [$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?] $($rest:tt)* )) => {
+        $crate::__define_err_emit! { @invalid }
+    };
+    (@variant ( $vattr:tt $s1:tt $s2:tt $s3:tt $s4:tt $s5:tt $s6:tt $s7:tt $s8:tt $($rest:tt)* )) => {
+        $crate::__define_err_meta_slot! { @once $s1 $s2 $s3 $s4 $s5 $s6 $s7 $s8 }
+    };
+
     (@struct [$ns:tt $docs:tt $rall:tt $rf:tt [$($acc:tt)*] [$($rest:tt)*]]
         [$($tattr:tt)*]
         [[$($code:tt)?] [$($cat:tt)?] [$($sev:tt)?] [$($kinds:tt)?] [$($public:tt)?] [$($action:tt)?] [$($retry:tt)?] [$($ra:tt)?]]

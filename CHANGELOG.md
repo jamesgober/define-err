@@ -11,6 +11,30 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- An enum not written in the canonical form no longer runs into the default
+  `recursion_limit` at a few dozen variants. Twelve variants with
+  `#[category]` before `#[code]` failed, as did 32 thiserror-style variants
+  such as `Io(#[from] io::Error)`, and a little over a hundred once any one
+  variant was irregular. Variant attributes in any order, doc comments among
+  them, and unnamed tuple fields are now read 32 variants per macro step, so
+  500 variants of these forms compile at the default limit (NFR-6).
+
+### Changed
+
+- A large enum with metadata expands faster: one of 1,000 variants took 6
+  seconds of compiler time instead of 28, one of 500 took 2.3 instead of
+  4.1. Smaller enums are unchanged.
+
+### Generated code
+
+- Unnamed tuple fields are bound by position, `__define_err_0` for the
+  first, with or without a field marker; a `#[from]`, `#[source]`, or
+  `#[location]` field used to be `__define_err_source` or
+  `__define_err_location`. The names are hygienic, so no user code sees
+  them. No `__private` item changed.
+
 ---
 
 ## [0.9.1] - 2026-11-08

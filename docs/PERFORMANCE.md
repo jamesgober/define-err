@@ -142,6 +142,17 @@ Types with a namespace or metadata keep the general passes. Nothing changes at r
 
 The last row is slower because the old scan stopped at the first control character and the new one reads the whole message.
 
+0.9.2 reads an enum 32 variants per macro step, where 0.9.1 matched one pattern over the whole list (D-087). The change is about the recursion limit (an enum not in the canonical form could fail to compile from 12 variants), but it also speeds up large enums with metadata, because rustc's matcher copies everything it has matched so far each time it enters an optional group, so one pattern over a long list costs time in proportion to the square of its length. Expansion time (CPU seconds of `rustc -Z unpretty=expanded`, the two versions alternated, fastest of three rounds, load average 80 to 95), each variant with a code and a category:
+
+| Crate | 0.9.1 | 0.9.2 |
+|---|---|---|
+| one enum of 500 variants | 4.14 s | 2.33 s |
+| one enum of 1,000 variants | 27.6 s | 6.1 s |
+| 20 enums of 8 variants, six rounds | 0.66 s | 0.58 s |
+| plain enum of 500 variants (the D-082 arm, unchanged) | 0.52 s | 0.46 s |
+
+The expanded code is the same, token for token, on these crates and on every test target, except the bindings of unnamed tuple fields with a field marker, which are now named by position.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.
