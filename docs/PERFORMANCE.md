@@ -153,6 +153,17 @@ The last row is slower because the old scan stopped at the first control charact
 
 The expanded code is the same, token for token, on these crates and on every test target, except the bindings of unnamed tuple fields with a field marker, which are now named by position.
 
+0.9.3 changes the block's duplicate-code check (D-088). Measured with `-Z time-passes` on a full debug build of 1,000 variants with codes, type checking took more time than expansion, and `__private::check_block` was about 2.5 s of it: it compared every pair of code numbers in const evaluation. It now sorts them and looks numbers up by binary search, with the same messages from the same lines. CPU seconds of a full debug build, the two versions alternated, fastest of four rounds (six for the two smaller crates), load average about 85:
+
+| Crate | 0.9.2 | 0.9.3 |
+|---|---|---|
+| one enum of 1,000 variants | 24.9 s | 21.9 s |
+| one enum of 500 variants | 9.95 s | 8.39 s |
+| one enum of 250 variants | 3.63 s | 3.13 s |
+| 20 enums of 8 variants | 3.27 s | 3.02 s |
+
+What is left for a type with metadata is spread over every variant: the probe costs about 3 ms of CPU per variant at this load, in its four `const` items and the UTF-8 check of `as_str`, and the `code_info` entry is built in expansion as well as in the catalog. These are linear, not quadratic, and D-077 found the obvious restructuring slower.
+
 ## Build times
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.

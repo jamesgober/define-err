@@ -12,7 +12,7 @@ Each requirement of `dev/PLAN.md` section 5 and the tests that check it (definit
 | FR-6 `#[non_exhaustive]` unless `#[exhaustive]` | `ui/non_exhaustive_downstream.rs`, `define_basic.rs::test_non_exhaustive_binds_downstream_and_exhaustive_opts_out`, `define_structs.rs::test_structs_are_not_non_exhaustive` | From a second crate, `tests/fixture` (D-079). |
 | FR-7 optional metadata costs nothing when absent | `define_meta.rs::test_plain_arm_answers_as_the_general_arm_does`, `traits.rs::test_size_and_alignment_equal_hand_written_and_thiserror`, `alloc_free.rs::test_codes_metadata_and_probe_allocate_nothing` | Generated code size is measured as build time (`docs/PERFORMANCE.md`), not by a test. |
 | FR-8 `Code` layout, text, width | `src/code.rs::test_code_parse_valid_forms_equal_by_identity`, `golden.rs::test_golden_codes_pack_parse_and_display`, `properties.rs::prop_code_round_trips_through_u64_and_text` | |
-| FR-9 duplicate codes are a compile error | `ui/duplicate_code.rs`, `ui/retired_code_reused.rs`, `ui/duplicate_code_across_types.rs` | |
+| FR-9 duplicate codes are a compile error | `ui/duplicate_code.rs`, `ui/retired_code_reused.rs`, `ui/duplicate_code_across_types.rs`, `src/private.rs::test_check_block_finds_a_duplicate_across_blocks` | Blocks of more than 2,048 codes by unit test (D-088). |
 | FR-10 a code needs help | `ui/code_without_help.rs`, `ui/codes_without_help.rs` | |
 | FR-11 `CATALOG` | `define_meta.rs::test_catalog_entries_titles_docs_and_retired`, `define_meta.rs::test_code_info_matches_catalog` | |
 | FR-12 deprecated codes | `define_meta.rs::test_deprecated_code_state_and_constant`, `ui/deprecated_code_used.rs` | |
@@ -45,4 +45,4 @@ Each requirement of `dev/PLAN.md` section 5 and the tests that check it (definit
 | NFR-11 `no_std` targets | CI `no-std` job (thumbv7em, thumbv6m, riscv32imac, wasm32) | |
 | NFR-12 a compile-fail case per error path | `tools/invariants.py`, CI `ui` job | |
 | NFR-13 API fits one page per module | the 1.0 audit (`docs/STABILITY-1.0.md`) | A review, not a test. |
-| NFR-14 source size | `tools/invariants.py` | 5,445 lines of code, over the 5,000 target (D-080, D-087). |
+| NFR-14 source size | `tools/invariants.py` | 5,507 lines of code, over the 5,000 target (D-080, D-087, D-088). |

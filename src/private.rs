@@ -388,27 +388,45 @@ pub const fn check_block(
     retired: &[u32],
     replacements: &[&[(u32, u32)]],
 ) {
-    let mut i = 0;
-    while i < numbers.len() {
-        if numbers[i] == INVALID_NUMBER {
-            i += 1;
-            continue;
+    // The numbers are sorted a block at a time and the rest looked up in the
+    // block, so a block of n codes costs O(n log n) in const evaluation, not
+    // the O(n^2) of comparing every pair (D-088).
+    let mut block = [0_u32; SORT_BLOCK];
+    let mut len = 0;
+    let mut start = 0;
+    while start < numbers.len() {
+        len = numbers.len() - start;
+        if len > SORT_BLOCK {
+            len = SORT_BLOCK;
         }
-        let mut j = i + 1;
+        let mut i = 0;
+        while i < len {
+            block[i] = numbers[start + i];
+            i += 1;
+        }
+        block = sorted(block, len);
+        let mut i = 1;
+        while i < len {
+            if block[i] == block[i - 1] && block[i] != INVALID_NUMBER {
+                panic!("{}", duplicate_message);
+            }
+            i += 1;
+        }
+        let mut j = start + len;
         while j < numbers.len() {
-            if numbers[i] == numbers[j] {
+            if numbers[j] != INVALID_NUMBER && sorted_contains(&block, len, numbers[j]) {
                 panic!("{}", duplicate_message);
             }
             j += 1;
         }
         let mut k = 0;
         while k < retired.len() {
-            if numbers[i] == retired[k] {
+            if retired[k] != INVALID_NUMBER && sorted_contains(&block, len, retired[k]) {
                 panic!("{}", duplicate_message);
             }
             k += 1;
         }
-        i += 1;
+        start += len;
     }
     let mut a = 0;
     while a < retired.len() {
@@ -426,12 +444,12 @@ pub const fn check_block(
         let mut p = 0;
         while p < replacements[r].len() {
             let (from, to) = replacements[r][p];
-            let mut found = false;
+            // One block holds every number unless there are more than
+            // `SORT_BLOCK`; past that, a scan.
+            let mut found = numbers.len() <= SORT_BLOCK && sorted_contains(&block, len, to);
             let mut n = 0;
-            while n < numbers.len() {
-                if numbers[n] == to {
-                    found = true;
-                }
+            while !found && numbers.len() > SORT_BLOCK && n < numbers.len() {
+                found = numbers[n] == to;
                 n += 1;
             }
             if from == to || !found {
@@ -441,6 +459,62 @@ pub const fn check_block(
         }
         r += 1;
     }
+}
+
+/// How many code numbers `check_block` sorts at a time.
+const SORT_BLOCK: usize = 2048;
+
+/// `values` with its first `len` entries in ascending order: a heapsort, by
+/// value because a `const fn` takes no `&mut` before Rust 1.83.
+const fn sorted(mut values: [u32; SORT_BLOCK], len: usize) -> [u32; SORT_BLOCK] {
+    let mut start = len / 2;
+    let mut end = len;
+    while end > 1 {
+        let mut root = 0;
+        if start > 0 {
+            start -= 1;
+            root = start;
+        } else {
+            end -= 1;
+            let top = values[0];
+            values[0] = values[end];
+            values[end] = top;
+        }
+        loop {
+            let mut child = 2 * root + 1;
+            if child >= end {
+                break;
+            }
+            if child + 1 < end && values[child] < values[child + 1] {
+                child += 1;
+            }
+            if values[root] >= values[child] {
+                break;
+            }
+            let parent = values[root];
+            values[root] = values[child];
+            values[child] = parent;
+            root = child;
+        }
+    }
+    values
+}
+
+/// Whether the first `len` entries of `values`, in ascending order, hold `x`.
+const fn sorted_contains(values: &[u32; SORT_BLOCK], len: usize, x: u32) -> bool {
+    let mut low = 0;
+    let mut high = len;
+    while low < high {
+        let mid = low + (high - low) / 2;
+        if values[mid] < x {
+            low = mid + 1;
+        } else if values[mid] > x {
+            high = mid;
+        } else {
+            return true;
+        }
+    }
+    false
 }
 
 /// The docs template names at least one placeholder. Const evaluation only.
@@ -779,7 +853,10 @@ mod tests {
     #[cfg(feature = "alloc")]
     use std::boxed::Box;
 
-    use super::{forward_source, info_of, source_of};
+    use super::{
+        check_block, forward_source, info_of, sorted, sorted_contains, source_of, INVALID_NUMBER,
+        SORT_BLOCK,
+    };
 
     #[derive(Debug)]
     struct Leaf;
@@ -860,5 +937,78 @@ mod tests {
     fn test_info_of_finds_error_info_or_none() {
         assert!(info_of!(&Node(Leaf)).is_some());
         assert!(info_of!(&Leaf).is_none());
+    }
+
+    /// Distinct numbers in a scrambled order: `i * 7919 mod 16777213`.
+    fn scrambled(count: u32) -> std::vec::Vec<u32> {
+        (0..count)
+            .map(|i| (u64::from(i) * 7919 % 16_777_213) as u32)
+            .collect()
+    }
+
+    #[test]
+    fn test_sorted_orders_the_prefix_and_keeps_its_values() {
+        let mut seed = 1_u32;
+        for len in (0..=40).chain([SORT_BLOCK - 1, SORT_BLOCK]) {
+            let mut values = [u32::MAX; SORT_BLOCK];
+            for value in values.iter_mut().take(len) {
+                seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+                *value = seed % 64;
+            }
+            let mut expected = values[..len].to_vec();
+            expected.sort_unstable();
+            let got = sorted(values, len);
+            assert_eq!(&got[..len], &expected[..], "len {len}");
+            assert!(got[len..].iter().all(|&v| v == u32::MAX), "len {len}");
+            assert!(
+                expected.iter().all(|&v| sorted_contains(&got, len, v)),
+                "len {len}"
+            );
+            assert!(!sorted_contains(&got, len, 64), "len {len}");
+        }
+    }
+
+    #[test]
+    fn test_check_block_accepts_distinct_numbers_in_several_blocks() {
+        let numbers = scrambled(5_000);
+        let retired = [16_777_214, 16_777_215];
+        let mut replacements = std::vec![&[][..]; numbers.len()];
+        let pairs = [(numbers[4_999], numbers[0])];
+        replacements[4_999] = &pairs;
+        check_block("dup", &numbers, &retired, &replacements);
+        check_block("dup", &numbers[..10], &[], &[]);
+        check_block("dup", &[INVALID_NUMBER, 3, INVALID_NUMBER], &[4], &[]);
+        check_block("dup", &[], &[], &[]);
+    }
+
+    #[test]
+    #[should_panic(expected = "dup")]
+    fn test_check_block_finds_a_duplicate_across_blocks() {
+        let mut numbers = scrambled(5_000);
+        numbers[4_500] = numbers[10];
+        check_block("dup", &numbers, &[], &[]);
+    }
+
+    #[test]
+    #[should_panic(expected = "dup")]
+    fn test_check_block_finds_a_duplicate_in_one_block() {
+        check_block("dup", &[5, 9, 2, 9], &[], &[]);
+    }
+
+    #[test]
+    #[should_panic(expected = "dup")]
+    fn test_check_block_finds_a_retired_number_in_a_later_block() {
+        let numbers = scrambled(5_000);
+        check_block("dup", &numbers, &[numbers[4_900]], &[]);
+    }
+
+    #[test]
+    #[should_panic(expected = "replacement must be another code")]
+    fn test_check_block_rejects_a_missing_replacement_past_one_block() {
+        let numbers = scrambled(5_000);
+        let pairs = [(numbers[0], 16_777_214)];
+        let mut replacements = std::vec![&[][..]; numbers.len()];
+        replacements[0] = &pairs;
+        check_block("dup", &numbers, &[], &replacements);
     }
 }
