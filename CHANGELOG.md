@@ -11,6 +11,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- `docs/STABILITY-1.0.md`, a draft of what 1.x will keep and how each promise
+  is checked. It binds nothing before 1.0.
+
 ---
 
 ## [0.9.2] - 2026-11-08

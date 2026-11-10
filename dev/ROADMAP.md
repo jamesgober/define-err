@@ -88,7 +88,7 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
   - re-run the security review (threats T1 to T17, attack tests, fuzz) and the edge-case review (E-1 to E-100 plus every case added since).
   Nothing accepted earlier in the series becomes final silently: whatever is still open goes into the 1.0 readiness note for James.
 - [ ] Release candidates `0.9.x` until no API change is needed for two weeks of use.
-- [ ] `docs/STABILITY-1.0.md` drafted with the requirement-to-test map (`tests/TRACEABILITY.md`).
+- [x] `docs/STABILITY-1.0.md` drafted with the requirement-to-test map (`tests/TRACEABILITY.md`) (2026-11-08, D-086): what 1.x keeps and how each promise is checked, the MSRV rule, what is not covered, and an empty audit record; the support window waits on James (J-4).
   - [x] `tests/TRACEABILITY.md`: every FR and NFR mapped to named tests; the gaps it found are fixed (FR-6 from a second crate, D-079; NFR-1, NFR-8, NFR-12, NFR-14 and the module boundary checked by `tools/invariants.py`, D-080; 22 compile-fail cases added and each mistake reported once, D-078) (2026-11-06).
   - [x] `dev/READINESS-1.0.md` started: James's decisions, the definition of done line by line, every open item.
 
