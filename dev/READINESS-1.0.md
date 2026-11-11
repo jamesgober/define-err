@@ -1,6 +1,6 @@
 # define-err - 1.0 readiness
 
-> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-08, at 0.9.2.
+> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-09, at 0.9.3.
 
 ## Decisions for James
 
@@ -46,4 +46,4 @@
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,445 lines of code against a 5,000 target | NFR-14, D-080, D-087 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,507 lines of code against a 5,000 target | NFR-14, D-080, D-087, D-088 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

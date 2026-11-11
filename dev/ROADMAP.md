@@ -78,6 +78,7 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
 - [x] `0.9.0` released, the first beta (2026-11-08, D-083): the security re-run's finding (D-081), the plain enum in one pass (D-082), the requirement map (D-078 to D-080).
 - [x] `0.9.1` released (2026-11-08): `Code` `Display` about 10% faster and the control-character scan four times faster (D-084, D-085); the D-060 run-time misses looked at again, with what stays and why in D-084.
 - [x] `0.9.2` released (2026-11-08): enums read 32 variants per macro step, with variant attributes in any order and unnamed tuple fields, so 500 variants of those forms compile at the default `recursion_limit` (D-087); a 1,000-variant enum with metadata expands in 6 s instead of 28.
+- [x] `0.9.3` released (2026-11-09): the duplicate-code check sorts the numbers instead of comparing every pair (D-088), so a 1,000-variant enum with codes builds in 21.9 s of CPU instead of 24.9; the 1.0 stability draft, `docs/STABILITY-1.0.md`.
 - [ ] Migrate noml-rust and mod-cli (draft PRs open); config-lib's path decided with James (`PLAN.md` 19.4).
 - [ ] L2 builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite; L3 reads codes through the probe.
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.
