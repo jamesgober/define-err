@@ -11,6 +11,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/API.md` gives the measured cost of each operation from
+  `docs/PERFORMANCE.md` in place of the estimates written before 0.6. Several
+  estimates were low: a filtered `report` is 5.7 ns, not 3, and `identify` on a
+  generated type is 26 ns, not 10. No code changed.
+
 ---
 
 ## [0.9.3] - 2026-11-09
