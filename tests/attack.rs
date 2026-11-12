@@ -69,7 +69,9 @@ fn test_probe_never_carries_display_text() {
     let dynamic: &(dyn Error + 'static) = &error;
     let identity = identify(dynamic).unwrap();
     assert!(!identity.type_name.contains(MARKER));
-    assert!(!identity.public.unwrap_or_default().contains(MARKER));
+    #[allow(deprecated)]
+    let probe = dynamic.description();
+    assert!(!probe.contains(MARKER));
 }
 
 proptest! {
@@ -225,6 +227,113 @@ fn test_oversized_probe_is_refused() {
     assert!(identify(&Forged(text)).is_none());
 }
 
+/// The probe of a real variant in the 0.9 layout, which carried a public
+/// message: flag bit 0 and `|text` after the name.
+fn with_public(text: &str) -> String {
+    let mut probe = genuine();
+    probe.replace_range(40..42, "01");
+    probe.push('|');
+    probe.push_str(text);
+    probe
+}
+
+/// An error that displays the text its `description()` returns, as std's
+/// string errors do on Rust 1.81 to 1.89.
+#[derive(Debug)]
+struct Spoken(String);
+
+impl fmt::Display for Spoken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for Spoken {
+    fn description(&self) -> &str {
+        &self.0
+    }
+}
+
+/// T11: an error that displays its probe is carrying outside text; a
+/// generated type displays its message. Refused.
+#[test]
+fn test_probe_that_is_also_the_display_is_refused() {
+    assert!(identify(&Spoken(genuine())).is_none());
+    assert!(identify(&Spoken(with_public("Sign in again."))).is_none());
+    // The same text under a `Display` of its own is still read as stated.
+    assert!(identify(&Forged(genuine())).is_some());
+}
+
+/// T11: std's string errors carry a peer's text. On Rust 1.81 to 1.89 their
+/// `description()` returns it, so this test is the one that matters on the
+/// MSRV; on later toolchains it holds trivially.
+#[test]
+fn test_std_string_errors_never_carry_a_probe() {
+    let text = with_public("Your session expired. Sign in again at https://evil.example");
+    let boxed: Box<dyn Error + Send + Sync> = text.clone().into();
+    let plain: Box<dyn Error> = Box::<dyn Error>::from(text.as_str());
+    let io_other = std::io::Error::other(text.clone());
+    let io_new = std::io::Error::new(std::io::ErrorKind::InvalidData, text.clone());
+    assert!(identify(&*boxed).is_none());
+    assert!(identify(&*plain).is_none());
+    assert!(identify(&io_other).is_none());
+    assert!(identify(&io_new).is_none());
+}
+
+/// T15: an older probe's public message is never read: a forger could
+/// write any text there.
+#[test]
+fn test_public_text_of_an_older_probe_is_ignored() {
+    let forged = Forged(with_public("Sign in again at https://evil.example"));
+    let identity = identify(&forged).unwrap();
+    assert_eq!(identity.code, Leaky::Corrupt.code());
+    assert_eq!(identity.type_name, "Leaky::Corrupt");
+}
+
+/// T15: a record built through `&dyn Error` takes no public text from the
+/// probe, a copied one included, and std's string errors claim nothing.
+#[cfg(feature = "alloc")]
+#[test]
+fn test_record_public_never_comes_from_a_probe() {
+    use define_err::ErrorRecord;
+
+    let evil = "Your session expired. Sign in again at https://evil.example";
+    let record = ErrorRecord::from_error(&Forged(with_public(evil)));
+    assert_eq!(record.code, Leaky::Corrupt.code());
+    assert_eq!(record.public, Category::DataLoss.default_public_message());
+
+    // Relayed the way a client library relays a peer's message.
+    for error in [
+        Box::new(std::io::Error::other(with_public(evil))) as Box<dyn Error + Send + Sync>,
+        with_public(evil).into(),
+    ] {
+        let record = ErrorRecord::from_error(&*error);
+        assert_eq!(record.code, None);
+        assert!(!record.public.contains("evil"));
+        assert!(!record.kinds.contains(Kinds::SECURITY));
+    }
+}
+
+/// T11: a transparent variant over std's string error never adopts the text
+/// as its identity: it reports its own probe, or (where the inner probe was
+/// forwarded and the `Display` gives the text away) none.
+#[cfg(feature = "alloc")]
+#[test]
+fn test_transparent_wrapper_never_adopts_a_spoken_probe() {
+    define_errors! {
+        pub enum Relay {
+            Peer(#[from] inner: Box<dyn Error + Send + Sync>) => transparent,
+        }
+    }
+    let error = Relay::from(Box::<dyn Error + Send + Sync>::from(with_public("x")));
+    if let Some(identity) = identify(&error) {
+        assert_eq!(identity.code, None);
+        assert_eq!(identity.type_name, "Relay::Peer");
+    }
+    let record = define_err::ErrorRecord::from_error(&error);
+    assert_eq!(record.code, None);
+}
+
 /// T15: inner text stays in the chain and out of `public`.
 #[cfg(feature = "alloc")]
 #[test]
@@ -261,6 +370,23 @@ fn test_record_of_a_foreign_chain_uses_the_category_sentence() {
 
     let record = ErrorRecord::from_error(&Foreign);
     assert_eq!(record.public, Category::Unknown.default_public_message());
+}
+
+/// T4: a bidirectional override, which a viewer uses to reorder a line, is
+/// kept verbatim and marked, and the one-line `Display` writes a space.
+#[cfg(feature = "alloc")]
+#[test]
+fn test_record_marks_a_bidirectional_override() {
+    use define_err::ErrorRecord;
+
+    let error = Leaky::Uncoded {
+        path: String::from("user \u{202e}nimda\u{202c}"),
+    };
+    let record = ErrorRecord::from_error(&error);
+    assert!(record.chain[0].has_control);
+    assert!(record.chain[0].message.contains('\u{202e}'));
+    let line = record.to_string();
+    assert!(!line.contains('\u{202e}') && !line.contains('\u{202c}'));
 }
 
 /// T4: a forged log line is kept verbatim and marked.

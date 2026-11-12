@@ -83,6 +83,10 @@ pub(crate) fn table_fires(_location: Location) -> bool {
     false
 }
 
+pub(crate) fn item_fires(_location: Location, _item: &str) -> bool {
+    false
+}
+
 #[inline]
 pub(crate) fn site_has_fired(_site: &Site) -> bool {
     true

@@ -97,8 +97,25 @@ fn mix(hash: u64, word: u64) -> u64 {
 /// By content, because the compiler may emit one location twice across
 /// codegen units. Never 0.
 pub(crate) fn key(file: &str, line: u32, column: u32) -> Key {
-    let mut hash = 0xcbf2_9ce4_8422_2325 ^ file.len() as u64;
-    let mut bytes = file.as_bytes();
+    fold(located(file, line, column))
+}
+
+/// The key of one item at a source location: what `deprecated(item)` warns
+/// about once, so a loop over several deprecated keys reports each of them.
+/// The item's length goes in first, so `"ab"` and `"ab\0"` differ. Never 0.
+pub(crate) fn item_key(file: &str, line: u32, column: u32, item: &str) -> Key {
+    let hash = mix(located(file, line, column), item.len() as u64);
+    fold(absorb(hash, item.as_bytes()))
+}
+
+/// The hash of a location, before folding.
+fn located(file: &str, line: u32, column: u32) -> u64 {
+    let hash = absorb(0xcbf2_9ce4_8422_2325 ^ file.len() as u64, file.as_bytes());
+    mix(hash, u64::from(line) << 32 | u64::from(column))
+}
+
+/// `bytes` mixed into `hash`, eight at a time, the tail padded with zeros.
+fn absorb(mut hash: u64, mut bytes: &[u8]) -> u64 {
     while let Some((chunk, rest)) = bytes.split_first_chunk::<8>() {
         hash = mix(hash, u64::from_le_bytes(*chunk));
         bytes = rest;
@@ -107,9 +124,12 @@ pub(crate) fn key(file: &str, line: u32, column: u32) -> Key {
     for (slot, byte) in tail.iter_mut().zip(bytes) {
         *slot = *byte;
     }
-    hash = mix(hash, u64::from_le_bytes(tail));
-    hash = mix(hash, u64::from(line) << 32 | u64::from(column));
-    // Folds to 32 bits where `Key` is 32 bits; the high half mixes in.
+    mix(hash, u64::from_le_bytes(tail))
+}
+
+/// Folds to 32 bits where `Key` is 32 bits (the high half mixes in), and
+/// never returns 0, the empty slot.
+fn fold(hash: u64) -> Key {
     let folded = (hash ^ (hash >> 32)) as Key;
     if folded == 0 {
         1
@@ -120,7 +140,7 @@ pub(crate) fn key(file: &str, line: u32, column: u32) -> Key {
 
 #[cfg(all(test, not(loom)))]
 mod tests {
-    use super::{key, Key, Seen, Site, SiteTable};
+    use super::{item_key, key, Key, Seen, Site, SiteTable};
 
     #[test]
     fn test_site_fires_once() {
@@ -176,6 +196,18 @@ mod tests {
             key("src/lib/one/mod.rs", 1, 2),
             key("src/lib/two/mod.rs", 1, 2)
         );
+    }
+
+    #[test]
+    fn test_item_key_depends_on_the_item_and_the_site() {
+        let base = item_key("src/a.rs", 1, 2, "pool.max");
+        assert_ne!(base, 0);
+        assert_ne!(base, key("src/a.rs", 1, 2));
+        assert_ne!(base, item_key("src/a.rs", 1, 2, "pool.min"));
+        assert_ne!(base, item_key("src/a.rs", 1, 3, "pool.max"));
+        assert_ne!(item_key("f", 1, 2, "ab"), item_key("f", 1, 2, "ab\0"));
+        assert_ne!(item_key("f", 1, 2, ""), key("f", 1, 2));
+        assert_eq!(base, item_key("src/a.rs", 1, 2, "pool.max"));
     }
 
     /// A collision silences a warning, so no two of a large set of sites may

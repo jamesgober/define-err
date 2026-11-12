@@ -57,17 +57,17 @@ python tools/build-time/compare.py --runs 10
 | `code()` and other `ErrorInfo` methods | under 1 ns | 0.24 ns | 0.5 to 0.7 ns | error-forge 0.4 to 0.6 ns | **met** |
 | `Code` `Display` | under 20 ns, no allocation | 24 ns | 39 ns (0.8) | error-forge `format!` 81 ns, allocates | **missed**; no allocation met |
 | `Code::parse` | under 15 ns, 20% faster than a `String` lookup | 8.7 ns | 12 ns | error-forge registry 75 ns | **met** |
-| catalog lookup by code | constant | | 0.6 ns, `catalog::find` 2.4 ns | error-forge registry 75 ns | **met** |
+| catalog lookup by code | constant | | `code_info` 0.6 ns; `catalog::find` 2.4 ns for two codes, linear; `Catalog::find` O(log n), est. under 50 ns at 10,000 codes | error-forge registry 75 ns | **met** by `code_info` and `Catalog` (0.10); `catalog::find` is a scan |
 | verb with nothing installed | one load, under 1 ns | 0.27 to 0.51 ns | 0.35 to 0.68 ns | | **met** |
 | the same, 20% faster than `log::warn!` at `Off` | 20% faster | 0.33 ns for `log` | 0.34 ns for `log` | `log` 0.4 | **missed**: parity |
 | `warn!` after its first delivery | under 2 ns | 0.50 ns | 0.65 ns | | **met** |
 | `warn()` after first delivery | under 5 ns | 7.0 ns | 16 ns | | **missed** |
 | `report` filtered by severity | under 3 ns | 5.7 ns | 6.2 ns | `log::warn!` filtered 0.34 ns | **missed** |
 | `report_with` filtered | | 0.64 ns | 0.91 ns | | |
-| `report` to a no-op reporter | under 10 ns plus the call | 31 ns | 49 ns | `log::error!` 2.9 ns | **missed** |
+| `report` to a no-op reporter | under 10 ns plus the call | 31 ns (0.9) | 49 ns (0.9) | `log::error!` 2.9 ns | **missed**; 0.10 adds the `identify` `Display` check, about 16 ns at the floor |
 | `report` of a foreign error, delivered | | 10.7 ns | 15 ns | | |
 | `notice` to a no-op reporter | | 5.1 ns | 7.8 ns | `log::error!` 2.9 ns | |
-| `identify`, generated type | under 10 ns | 26 ns | 29 ns | | **missed** |
+| `identify`, generated type | under 10 ns | 38 ns (0.10; 26 ns in 0.9) | 48 ns (0.10, under load) | | **missed**: 0.10 adds the `Display` check (D-091) |
 | `identify`, foreign type | under 2 ns | 1.8 ns | 2.1 ns | | **met** |
 | `ErrorRecord::from_error`, three levels | under 1 us, allocations published | | 645 ns; one level 394 ns; clone 210 ns | none | **met**: 7 allocations for three foreign levels, 4 for one generated level, pinned in `tests/alloc_free.rs` |
 | `warn!`, 16 threads, one site | | | 1.6 ns | | |
@@ -163,6 +163,8 @@ The expanded code is the same, token for token, on these crates and on every tes
 | 20 enums of 8 variants | 3.27 s | 3.02 s |
 
 What is left for a type with metadata is spread over every variant: the probe costs about 3 ms of CPU per variant at this load, in its four `const` items and the UTF-8 check of `as_str`, and the `code_info` entry is built in expansion as well as in the catalog. These are linear, not quadratic, and D-077 found the obvious restructuring slower.
+
+0.10.0 makes `identify` refuse an error whose `Display` also begins with the probe's magic (D-091): on Rust 1.81 to 1.89, std's string errors return their message from `description()`, so outside text could pass for a generated error. The check is one `Display` call into a writer that stops after four bytes, made only for an otherwise valid probe, and for a generated type that is the cost of its own `Display` up to its first piece. 0.9.3 and 0.10 alternated in one harness (two million calls, fastest of 40 runs, three rounds, load average about 130), `identify` on `DbError::Timeout { after_ms }`: 22.2 to 22.8 ns before, 37.3 to 39.9 ns after; the check alone 15.4 to 16.8 ns. The criterion benches, the two versions alternated for three rounds (a fourth, run beside the test gate, is left out): `identify` 24.4 to 29.1 ns mean before, 47.2 to 48.9 after. The minimum-severity drop in `report` does not make the check, so `report` with nothing installed and filtered `report` are unchanged (filtered 8.6 to 9.8 ns before and 9.1 to 9.2 after in the same runs). The kinds mask is now one 64-bit load where it was two 32-bit loads (D-093).
 
 ## Build times
 

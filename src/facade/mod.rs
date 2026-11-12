@@ -10,6 +10,8 @@ mod control;
 mod event;
 mod guard;
 #[cfg(target_has_atomic = "32")]
+mod mask;
+#[cfg(target_has_atomic = "32")]
 mod sites;
 #[cfg(target_has_atomic = "32")]
 mod slot;
@@ -223,6 +225,28 @@ pub fn set_boxed_reporter(reporter: alloc::boxed::Box<dyn Reporter>) -> Result<(
 #[must_use]
 pub fn is_installed() -> bool {
     state::is_ready(state::load())
+}
+
+/// Whether an event of this severity and these kinds would reach the
+/// reporter now: one is installed, the severity is at or above the minimum,
+/// and the kinds pass the mask (the default mask passes everything, an event
+/// with no kinds included). The rule `report_record` applies, for a caller
+/// that would otherwise build a record only to have it dropped. One load and
+/// the mask.
+///
+/// # Examples
+///
+/// ```
+/// use define_err::{Kinds, Severity};
+///
+/// // Nothing is installed here, so nothing would be delivered.
+/// assert!(!define_err::would_deliver(Severity::ERROR, Kinds::ERROR));
+/// ```
+#[inline]
+#[must_use]
+pub fn would_deliver(severity: Severity, kinds: Kinds) -> bool {
+    let word = state::load();
+    state::is_ready(word) && state::passes(word, severity, kinds)
 }
 
 /// The installed reporter, for code that forwards events.

@@ -67,7 +67,7 @@ Costs marked [measured] come from [`PERFORMANCE.md`](./PERFORMANCE.md): the floo
   - [`CodeInfo`](#codeinfo)
   - [`CodeState`](#codestate)
   - [`UrlDisplay`](#urldisplay)
-  - [`catalog::find` and `catalog::check_unique`](#catalogfind-and-catalogcheck_unique)
+  - [`catalog::find`, `catalog::check_unique`, and `catalog::Catalog`](#catalogfind-catalogcheck_unique-and-catalogcatalog)
 - [Identity probe](#identity-probe)
   - [`identify`](#identify)
   - [`innermost_code`](#innermost_code)
@@ -77,7 +77,7 @@ Costs marked [measured] come from [`PERFORMANCE.md`](./PERFORMANCE.md): the floo
   - [`Reporter`](#reporter)
   - [`set_reporter` and `set_boxed_reporter`](#set_reporter-and-set_boxed_reporter)
   - [`InstallError` and `Slot`](#installerror-and-slot)
-  - [`is_installed`, `reporter`, `reporter_installed_at`, `flush`](#is_installed-reporter-reporter_installed_at-flush)
+  - [`is_installed`, `would_deliver`, `reporter`, `reporter_installed_at`, `flush`](#is_installed-would_deliver-reporter-reporter_installed_at-flush)
   - [`report`, `report_with`, `report_record`](#report-report_with-report_record)
   - [`notice` and `notice!`](#notice-and-notice)
   - [`warn` and `warn!`](#warn-and-warn)
@@ -103,7 +103,7 @@ Costs marked [measured] come from [`PERFORMANCE.md`](./PERFORMANCE.md): the floo
 
 ```toml
 [dependencies]
-define-err = "0.9.3"
+define-err = "0.10.0"
 ```
 
 ### Features
@@ -122,7 +122,7 @@ The crate is `#![no_std]`. `default-features = false` gives `core` only: every m
 
 ```toml
 [dependencies]
-define-err = { version = "0.9.3", default-features = false }
+define-err = { version = "0.10.0", default-features = false }
 ```
 
 MSRV is 1.81, the first release with `core::error::Error`.
@@ -144,7 +144,7 @@ The reporting verbs are not in the prelude. They are called by path, `define_err
 | Tier | What | Examples |
 |---|---|---|
 | 1 | the macro and the verbs: no configuration, no type parameters | `define_errors!`, `report`, `notice`, `warn`, `trigger`, `deprecated`, `set_reporter`, `err.code()`, `err.category().http_status()`, `Secret::new` |
-| 2 | configuration and tables for the next 15% of uses | `set_warn_mode`, `set_min_severity`, `set_kinds_mask`, `report_with`, `RecordLimits`, `LevelNames`, `catalog::find`, `set_boxed_reporter`, `CodeInfo::new` |
+| 2 | configuration and tables for the next 15% of uses | `set_warn_mode`, `set_min_severity`, `set_kinds_mask`, `report_with`, `RecordLimits`, `LevelNames`, `catalog::find`, `catalog::Catalog`, `would_deliver`, `set_boxed_reporter`, `CodeInfo::new` |
 | 3 | the full surface for other libraries | `identify`, `Code::from_u64`, `Kinds::from_bits`, `Event::new`, `ErrorRecord::new`, the creation hook, `__private` (generated code only) |
 
 ### No panics, and the errors this crate returns
@@ -1267,12 +1267,23 @@ let info = DbError::Timeout { after_ms: 1 }.code_info().unwrap();
 assert_eq!(info.url().unwrap().to_string(), "https://docs.example.com/errors/DB-0001");
 ```
 
-### `catalog::find` and `catalog::check_unique`
+### `catalog::find`, `catalog::check_unique`, and `catalog::Catalog`
 
 ```rust
 pub mod catalog {
     pub fn find(catalogs: &[&'static [CodeInfo]], code: Code) -> Option<&'static CodeInfo>;
     pub fn check_unique(catalogs: &[&'static [CodeInfo]]) -> Result<(), DuplicateCode>;
+
+    #[cfg(feature = "alloc")]
+    #[derive(Clone, Debug)]
+    pub struct Catalog { /* one reference per entry, sorted by code */ }
+    impl Catalog {
+        pub fn new(catalogs: &[&'static [CodeInfo]]) -> Result<Catalog, DuplicateCode>;
+        pub fn find(&self, code: Code) -> Option<&'static CodeInfo>;
+        pub fn len(&self) -> usize;
+        pub fn is_empty(&self) -> bool;
+        pub fn iter(&self) -> impl Iterator<Item = &'static CodeInfo> + '_;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1282,8 +1293,9 @@ impl core::fmt::Display for DuplicateCode;
 impl core::error::Error for DuplicateCode;
 ```
 
-- `find` searches several catalogs (one per crate, or per type) in order and returns the first entry with that code [measured: 2.4 ns for a two-code catalog; est. under 1 us for 1,000 codes].
-- `check_unique` is the boot-time check across crates: two crates that picked the same namespace and number are a configuration error. Retired entries count as taken. `first` and `second` are the type names of the two entries (empty for a retired entry). `Display`: "code DB-0001 is defined twice: by DbError::Timeout and by StoreError::Busy; give one crate its own namespace".
+- `find` searches several catalogs (one per crate, or per type) in order and returns the first entry with that code. It is linear: right for one crate's catalog or an occasional lookup [measured: 2.4 ns for a two-code catalog; est. 3 us at 1,000 codes and 30 us at 10,000 for a code near the end].
+- `check_unique` is the boot-time check across crates: two crates that picked the same namespace and number are a configuration error. Retired entries count as taken. `first` and `second` are the type names of the two entries, in the order the catalogs list them (empty for a retired entry). With `alloc` it sorts references, O(n log n) [est. 1 ms at 10,000 codes]; without, it compares every pair. `Display`: "code DB-0001 is defined twice: by DbError::Timeout and by StoreError::Busy; give one crate its own namespace".
+- `Catalog` (`alloc`, since `0.10`) indexes several catalogs once: `new` makes the same check as `check_unique` and keeps the sorted references, and `find` is a binary search [est. under 50 ns at 10,000 codes]. An application or error service that looks codes up across every crate builds one at boot.
 
 The compile-time duplicate check covers one block; this covers everything a binary links.
 
@@ -1291,8 +1303,8 @@ The compile-time duplicate check covers one block; this covers everything a bina
 use define_err::catalog;
 
 let all: &[&[define_err::CodeInfo]] = &[DbError::CATALOG, PlanError::CATALOG, other_crate::CATALOG];
-catalog::check_unique(all)?;                                // at boot: fail closed on a collision
-let info = catalog::find(all, code).ok_or("unknown code")?;
+let index = catalog::Catalog::new(all)?;                    // at boot: fail closed on a collision
+let info = index.find(code).ok_or("unknown code")?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -1302,7 +1314,7 @@ Since `0.4` (PRB-01 to PRB-03; DEF-13 generates the probe).
 
 The problem it solves: libraries that hold errors as `&dyn Error` (a dynamic error type, a renderer, the error service) cannot ask a trait object for its `ErrorInfo`; stable Rust cannot cast between trait objects. Generated code answers through `Error::description`, which every `dyn Error` has, with a fixed string built at compile time. The format is in [`GENERATED-CODE.md`](./GENERATED-CODE.md#the-identity-probe) and frozen at 1.0.
 
-The probe carries only per-variant constants. Per-value data (a location, a `retry_after` field) is reached through `ErrorInfo` on the concrete type. Codes identify an error; they do not authenticate it: a foreign type could return a forged probe, and the error service checks a probe's type name against the catalog when that matters.
+The probe carries only per-variant constants, and no text a client sees. Per-value data (a location, a `retry_after` field) and the public message are reached through `ErrorInfo` on the concrete type. Codes identify an error; they do not authenticate it: a foreign type could return a forged probe, and the error service checks a probe's type name against the catalog when that matters.
 
 ### `identify`
 
@@ -1310,7 +1322,7 @@ The probe carries only per-variant constants. Per-value data (a location, a `ret
 pub fn identify<'a>(error: &'a (dyn core::error::Error + 'static)) -> Option<Identity<'a>>;
 ```
 
-Reads the identity of an error generated by `define_errors!` or the attribute front end. Returns `None` for any other error, after one comparison of the first four bytes. Every field is validated (code layout, severity range, category range, ASCII name); a malformed probe is `None`. No allocation [measured: 26 ns floor, 29 ns mean for a generated type; 1.8 ns floor, 2.1 ns mean for a foreign one].
+Reads the identity of an error generated by `define_errors!` or the attribute front end. Returns `None` for any other error, after one comparison of the first four bytes. Every field is validated (code layout, severity range, category range, ASCII name); a malformed probe is `None`. An error whose `Display` also begins with the probe's magic is `None` (`0.10`): that is outside text shaped like a probe, which std's string errors (`io::Error::other(String)`, `Box<dyn Error>::from(String)`) carry on Rust 1.81 to 1.89, where their `description()` returns their message. A generated type displays its message, never its probe. The check is one `Display` call that stops after four bytes, made only once the magic matched. No allocation [measured: 38 ns floor for a generated type in 0.10, of which 16 are the `Display` check (0.9: 26 ns floor, 29 ns mean); 1.8 ns floor, 2.1 ns mean for a foreign one].
 
 ```rust
 use define_err::identify;
@@ -1350,14 +1362,12 @@ pub struct Identity<'a> {
     pub severity: Severity,
     pub category: Category,
     pub kinds: Kinds,
-    pub has_public: bool,
-    pub public: Option<&'a str>,
     pub transparent: bool,
     pub type_name: &'a str,
 }
 ```
 
-`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. `has_public` says the variant wrote its own public message, and `public` is that text (otherwise the category's default applies). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`SVC-00001`, not `SVC-0001`).
+`type_name` borrows from the error (a probe from a foreign type could be non-`'static`); copy it to keep it. There is no public message: a probe read through `&dyn Error` can be imitated, so client-safe text comes only from `ErrorInfo::public_message()` on the typed value or from a catalog entry (`0.10` removed `has_public` and `public`). `transparent` is set when a transparent wrapper's inner value has no probe of its own. `code` is the full code value, width included, so `id.code.unwrap().to_string()` displays the code as the variant defined it (`SVC-00001`, not `SVC-0001`).
 
 ## `Secret<T>`
 
@@ -1496,22 +1506,24 @@ pub enum Slot { Reporter, CreationHook }
 
 Returned when a write-once slot is already taken. `installed_at` is where the first installation succeeded (`None` only if the losing call raced the winner between its claim and its publish). `Display`: "a reporter is already installed (at src/boot.rs:41:5); install it once, at start-up".
 
-### `is_installed`, `reporter`, `reporter_installed_at`, `flush`
+### `is_installed`, `would_deliver`, `reporter`, `reporter_installed_at`, `flush`
 
 ```rust
 pub fn is_installed() -> bool;
+pub fn would_deliver(severity: Severity, kinds: Kinds) -> bool;
 pub fn reporter() -> Option<&'static dyn Reporter>;
 pub fn reporter_installed_at() -> Option<Location>;
 pub fn flush();
 ```
 
-- `is_installed`: one load. Lets a caller skip expensive preparation (building an `ErrorRecord`) when nobody listens.
+- `is_installed`: one load. Lets a caller skip expensive preparation when nobody listens.
+- `would_deliver` (since `0.10`): whether an event of that severity and those kinds would reach the reporter now. The rule `report_record` applies: installed, at or above the minimum severity, and passing the kinds mask (the default mask passes everything, an event with no kinds included). One load and the mask. A dynamic error type asks it before building an `ErrorRecord`, so a filtered report costs nothing.
 - `reporter`: the installed reporter, for code that forwards events.
 - `reporter_installed_at`: where the reporter was installed, for audits ("who is reading our errors?").
 - `flush`: calls `Reporter::flush` (for example before the process exits); returns at once when nothing is installed.
 
 ```rust
-if define_err::is_installed() {
+if define_err::would_deliver(Severity::ERROR, Kinds::ERROR) {
     let record = build_expensive_record();
     define_err::report_record(&record);
 }
@@ -1639,7 +1651,7 @@ macro_rules! deprecated {
 }
 ```
 
-A run-time deprecation warning for anything that is not a Rust item (a configuration key, a protocol field, an API endpoint): kinds `DEPRECATED | WARNING`, severity `WARNING`, once per call site like `warn`. The message is "`<item>` is deprecated[ since <since>][; use <replacement> instead]", backticks included. Rust items use `#[deprecated]` instead; deprecated codes are marked in the catalog.
+A run-time deprecation warning for anything that is not a Rust item (a configuration key, a protocol field, an API endpoint): kinds `DEPRECATED | WARNING`, severity `WARNING`. `deprecated!` delivers once per call site, like `warn!`; the function `deprecated(item)` once per item at each call site (`0.10`), so one call in a loop over a configuration file's keys reports each deprecated key once. Each distinct item takes one entry of the 512-entry table `warn` uses. The message is "`<item>` is deprecated[ since <since>][; use <replacement> instead]", backticks included. Rust items use `#[deprecated]` instead; deprecated codes are marked in the catalog.
 
 ```rust
 if config.contains("pool.max") {
@@ -1817,6 +1829,10 @@ define_err::set_creation_hook(&SCOPE)?;
 
 On targets without atomic compare-and-swap (`thumbv6m-none-eabi`), the slots cannot be claimed safely, so the facade is compiled out: `set_reporter`, `set_boxed_reporter`, and `set_creation_hook` do not exist, and every verb compiles to an empty `#[inline]` function. Library code that reports still compiles unchanged on those targets. (A racy installer for such targets is planned after 1.0, FAC-19.)
 
+### One copy per build
+
+The slots, filters, and site table are statics of one copy of the crate, and before 1.0 every minor version is a separate copy. Since `0.10` the manifest sets `links = "define_err_facade"` (with an empty `build.rs`), so Cargo refuses a build that would hold two copies from 0.10 on and names both paths; the fix is to move every dependency to one line. Copies from 0.9 and older cannot be refused this way: `cargo tree -d -i define-err` lists them. See [`PLATFORM-NOTES.md`](./PLATFORM-NOTES.md#two-copies-of-define-err).
+
 ## `ErrorRecord`
 
 Since `0.5` (REC-01 to REC-06). Feature `alloc`.
@@ -1849,7 +1865,7 @@ impl core::fmt::Display for ErrorRecord;   // "[DB-0001] query timed out after 5
 | Field | Content |
 |---|---|
 | `code`, `severity`, `category`, `kinds` | from the outermost entry of the chain that has a code, else from the outermost entry |
-| `public` | the public message of that entry, or its category's default; never any `Display` text |
+| `public` | the category's default public message of that entry; never any `Display` text, and never text from the identity probe, which outside text can imitate (`0.10`). A caller that holds the typed error sets its own: `record.public = err.public_message().into()` |
 | `chain` | one entry per error, outermost first: the private message, the entry's code, its type name |
 | `fields` | key and value pairs added by the creator or a hook |
 | `trail` | locations: where the error was created, converted, given context, reported |
@@ -1858,7 +1874,7 @@ impl core::fmt::Display for ErrorRecord;   // "[DB-0001] query timed out after 5
 | `handled` | whether the error was handled (OpenTelemetry's distinction for severities); `true` unless a caller says otherwise |
 | `truncated` | a limit was hit somewhere |
 
-`Display` writes one line (`[code] outer message: caused by inner message ...`), with control characters as spaces; every other format belongs to the render library. The limits the record was built with are kept with it (not a public field), so later additions stay inside the same bounds.
+`Display` writes one line (`[code] outer message: caused by inner message ...`), with control characters and bidirectional overrides as spaces; every other format belongs to the render library. The limits the record was built with are kept with it (not a public field), so later additions stay inside the same bounds.
 
 ### Building a record
 
@@ -1977,7 +1993,7 @@ impl TrailEntry {
 pub enum TrailStep { Created, Converted, Context, Reported }
 ```
 
-`has_control` is set when the message contains a control character (a newline, an escape), so a log sink can escape it without scanning again. Messages are stored verbatim: escaping is the sink's job. Trail entries hold owned or borrowed file names, so a record received from another node needs no `'static` data.
+`has_control` is set when the message contains a control character (a newline, an escape) or a bidirectional embedding, override, or isolate (U+202A to U+202E, U+2066 to U+2069, since `0.10`), which a viewer uses to reorder text, so a log sink can escape it without scanning again. Messages are stored verbatim: escaping is the sink's job. Trail entries hold owned or borrowed file names, so a record received from another node needs no `'static` data.
 
 ## `testing`
 
@@ -2061,11 +2077,13 @@ assert!(!define_err::VERSION.is_empty());
 | INF-02, INF-03 | `CodeInfo`, `CodeState`, `UrlDisplay` | 2 | P0/P1 | 0.4 |
 | INF-04 | `ErrorInfo for std::io::Error` | 1 | P2 | 0.4 |
 | INF-05, INF-06 | `catalog::find`, `catalog::check_unique`, `DuplicateCode` | 2 | P1 | 0.4 |
+| INF-08 | `catalog::Catalog`, the indexed form | 2 | P1 | 0.10 |
 | INF-07 | `Location`, `here` | 1 | P1 | 0.3 |
 | PRB-01 to PRB-03 | probe format, `identify`, `innermost_code`, `Identity` | 3 | P0/P1 | 0.4 |
 | SEC-01 to SEC-03 | `Secret<T>` | 1 | P0 | 0.3 |
 | FAC-01 to FAC-18 | `Reporter`, slots, `InstallError`, verbs and macros, `Event`, `Verb`, filters, `stats`, guards, targets without CAS | 1/2/3 | P0 to P2 | 0.5 |
 | FAC-20 | `report_record` and `Event::record` | 2 | P1 | 0.5 |
+| FAC-22 | `would_deliver` | 2 | P1 | 0.10 |
 | FAC-21 | creation-hook slot: `CreationHook`, `CreationInfo`, `Annotate`, `set_creation_hook`, `creation_hook` | 3 | P1 | 0.5 |
 | FAC-19 | racy installer for targets without CAS | 3 | P3 | after 1.0 |
 | REC-01 to REC-06 | `ErrorRecord`, building, limits, adding, `Display` | 2/3 | P0/P1 | 0.5 |

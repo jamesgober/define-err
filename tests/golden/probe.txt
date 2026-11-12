@@ -1,9 +1,9 @@
 # define-err golden file: identity probe strings (dev/PLAN.md 7.11, docs/GENERATED-CODE.md). Frozen at 1.0.
 # '\0' in this file stands for the single byte 0x00 (NUL). Layout: magic (4) | code value hex, width included (16, or 16 'x')
-# | severity hex (2) | category gRPC number hex (2) | kinds hex (16) | flags hex (2; bit 0 public message, bit 1 transparent) | '|' | type name
-# | with flag bit 0: '|' and the public message.
+# | severity hex (2) | category gRPC number hex (2) | kinds hex (16) | flags hex (2; bit 1 transparent) | '|' | type name.
+# Flag bit 0 is retired (0.10): 0.9 and older set it and appended '|' and the public message; decoders ignore that text.
 # columns: case	probe
-DbError::Timeout (code DB-0001, DeadlineExceeded, public message)	\0DE13b34a2f2600000011104000000000000000101|DbError::Timeout|The database is busy. Try again shortly.
+DbError::Timeout (code DB-0001, DeadlineExceeded, public message)	\0DE13b34a2f2600000011104000000000000000100|DbError::Timeout
 DbError::Corrupt (code DB-0002, DataLoss, CRITICAL, ERROR|SECURITY)	\0DE13b34a2f260000002140f000000000000001100|DbError::Corrupt
 DbError::Quota (code DB-0010, ResourceExhausted, kinds project(0))	\0DE13b34a2f26000000a1108000000010000000000|DbError::Quota
 ServiceError::Config (code SVC-00001, InvalidArgument)	\0DE17b7a347a800000010d03000000000000000100|ServiceError::Config

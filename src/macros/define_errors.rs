@@ -294,11 +294,19 @@ macro_rules! __define_err_type {
         $crate::__define_err_enum! { @start [$($ctx)* [$($rest)*]] [$($acc)* $($debug)* $($ne)*] ($vis) $name { $($body)* } }
     };
     (@attrs [$($ctx:tt)*] [$($acc:tt)*] [$($debug:tt)*] [$($ne:tt)*] [$($ex:tt)*] [$($meta:tt)*]
+        $vis:vis enum $name:ident < $($rest:tt)*) => {
+        ::core::compile_error! { "define_errors!: generic type and lifetime parameters are not supported; see \"Limits\" in docs/API.md" }
+    };
+    (@attrs [$($ctx:tt)*] [$($acc:tt)*] [$($debug:tt)*] [$($ne:tt)*] [$($ex:tt)*] [$($meta:tt)*]
         $vis:vis enum $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: metadata attributes (`#[code]`, `#[category]`, ...) go on the enum's variants, not on the enum" }
     };
 
     // Structs: braced, tuple, unit. `#[non_exhaustive]` is never added.
+    (@attrs [$($ctx:tt)*] [$($acc:tt)*] [$($debug:tt)*] [$($ne:tt)*] [$($ex:tt)*] [$($meta:tt)*]
+        $vis:vis struct $name:ident < $($rest:tt)*) => {
+        ::core::compile_error! { "define_errors!: generic type and lifetime parameters are not supported; see \"Limits\" in docs/API.md" }
+    };
     (@attrs [$($ctx:tt)*] [$($acc:tt)*] [$($debug:tt)*] [$($ne:tt)*] [exhaustive] [$($meta:tt)*] $vis:vis struct $($rest:tt)*) => {
         ::core::compile_error! { "define_errors!: `#[exhaustive]` applies only to enums; a struct is never made `#[non_exhaustive]`" }
     };

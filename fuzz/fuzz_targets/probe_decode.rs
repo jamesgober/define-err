@@ -19,8 +19,26 @@ impl std::error::Error for Forged {
     }
 }
 
+/// An error that displays what its `description()` returns, as std's string
+/// errors do on Rust 1.81 to 1.89: never identified, whatever the text.
+#[derive(Debug)]
+struct Spoken(String);
+
+impl std::fmt::Display for Spoken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Spoken {
+    fn description(&self) -> &str {
+        &self.0
+    }
+}
+
 fuzz_target!(|data: &[u8]| {
     let Ok(text) = std::str::from_utf8(data) else { return };
+    assert!(identify(&Spoken(text.to_owned())).is_none());
     let forged = Forged(text.to_owned());
     if let Some(identity) = identify(&forged) {
         assert!((1..=24).contains(&identity.severity.get()));

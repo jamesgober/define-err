@@ -51,7 +51,7 @@ Warnings raised before installation are not lost: they do not use up their call 
 | `notice("...")`, `notice!` | something worth recording, below a warning | `NOTICE` | `NOTICE` | no |
 | `warn("...")`, `warn!` | something is wrong but work continues | `WARNING` | `WARNING` | yes |
 | `trigger(kinds, "...")`, `trigger!` | raise a named condition on purpose | `TRIGGER` plus the given kinds | `WARNING` | no |
-| `deprecated("...")`, `deprecated!` | a configuration key, protocol field, or endpoint is on its way out | `DEPRECATED`, `WARNING` | `WARNING` | yes |
+| `deprecated("...")`, `deprecated!` | a configuration key, protocol field, or endpoint is on its way out | `DEPRECATED`, `WARNING` | `WARNING` | yes (the function: once per item at each site) |
 | `soft(err)` | a warning today that a strict deployment refuses | `WARNING` plus the error's | `WARNING` | no |
 
 Report at boundaries, not at every `?`: reporting never changes control flow, so a chain of `?` that reports at each step reports the same error many times.
@@ -63,7 +63,7 @@ The macros evaluate their arguments only when the event could be delivered: with
 ## Once per call site
 
 - **The macros** keep one flag at each call site: exact, for any number of sites. A site inside a generic function is one site for every instantiation.
-- **The functions** cannot own a static per call site, so they keep a fixed, lock-free table of 512 sites, keyed by a hash of the caller's file, line, and column. Past 512 distinct sites, the extra sites deliver every time and `stats().site_table_overflow` counts them: a warning is never lost to the table. A false match needs a 64-bit hash collision among at most 512 sites (below 10^-14). Targets without 64-bit atomics use 32-bit hashes (about 3 x 10^-5, across all 512).
+- **The functions** cannot own a static per call site, so they keep a fixed, lock-free table of 512 sites, keyed by a hash of the caller's file, line, and column. Past 512 distinct sites, the extra sites deliver every time and `stats().site_table_overflow` counts them: a warning is never lost to the table. A false match needs a 64-bit hash collision among at most 512 sites (below 10^-14). Targets without 64-bit atomics use 32-bit hashes (about 3 x 10^-5, across all 512). `deprecated(item)` keys the table by the site and the item, so one call in a loop over a configuration file's keys reports each deprecated key once; each distinct item takes one of the 512 entries. `deprecated!` keeps its one flag per site.
 
 A site is marked only when the warning would reach the reporter. A warning filtered out by the severity or kinds filter, ignored by the mode, or raised before installation keeps its one delivery for later.
 

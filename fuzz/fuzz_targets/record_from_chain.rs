@@ -60,8 +60,15 @@ fuzz_target!(|data: &[u8]| {
     assert!(total <= limits.max_total_bytes);
     for entry in &record.chain {
         assert!(entry.message.len() <= limits.max_message_bytes);
-        assert_eq!(entry.has_control, entry.message.chars().any(char::is_control));
+        assert_eq!(
+            entry.has_control,
+            entry.message.chars().any(|c| c.is_control()
+                || matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
+        );
     }
     let line = record.to_string();
     assert!(!line.contains('\n'));
+    assert!(!line
+        .chars()
+        .any(|c| matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')));
 });

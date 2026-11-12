@@ -92,8 +92,11 @@ pub struct ChainEntry {
     pub code: Option<Code>,
     /// `"Type::Variant"`, or `"unknown"` for an error without a probe.
     pub type_name: Cow<'static, str>,
-    /// The message contains a control character (a newline, an escape), so a
-    /// log sink can escape it without scanning again.
+    /// The message contains a control character (a newline, an escape) or a
+    /// bidirectional override (U+202A to U+202E, U+2066 to U+2069), which a
+    /// viewer uses to show text in another order. A log sink escapes the
+    /// message when this is set, without scanning again; the record's own
+    /// one-line `Display` replaces each such character with a space.
     pub has_control: bool,
 }
 
@@ -207,8 +210,11 @@ pub struct ErrorRecord {
     pub category: Category,
     /// As `code`.
     pub kinds: Kinds,
-    /// That entry's `#[public]` message, or its category's default; never any
-    /// `Display` text.
+    /// Text a client may see: the category's default message of the entry
+    /// that gave `code`. A record built from `&dyn Error` never takes text
+    /// from the error itself, neither `Display` nor the identity probe, which
+    /// outside text can imitate. A caller that holds the typed error sets its
+    /// own: `record.public = err.public_message().into()`.
     pub public: Cow<'static, str>,
     /// One entry per error, outermost first.
     pub chain: Vec<ChainEntry>,
@@ -267,11 +273,19 @@ fn floor_boundary(text: &str, index: usize) -> usize {
     at
 }
 
-/// Whether `text` holds a character for which `char::is_control` is true
-/// (C0, DEL, C1), eight bytes at a time (PLAN 10.2, D-085). Each test puts a
-/// match into its byte's high bit through the borrow of a subtraction, which
-/// is exact for "is there one". C1 is U+0080 to U+009F, so only text with a
-/// 0xC2 lead byte takes the check by character.
+/// Whether `c` changes how a log line reads: a control character (C0, DEL,
+/// C1) or a bidirectional embedding, override, or isolate, the characters
+/// rustc's `text_direction_codepoint_in_literal` lint names.
+fn is_hidden(c: char) -> bool {
+    c.is_control() || matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
+}
+
+/// Whether `text` holds a character for which `is_hidden` is true, eight
+/// bytes at a time (PLAN 10.2, D-085). Each test puts a match into its byte's
+/// high bit through the borrow of a subtraction, which is exact for "is there
+/// one". C1 is U+0080 to U+009F, behind a 0xC2 lead byte, and the
+/// bidirectional controls are behind 0xE2, so only text with one of those
+/// lead bytes takes the check by character.
 fn has_control(text: &str) -> bool {
     const ONES: u64 = 0x0101_0101_0101_0101;
     let (mut found, mut lead) = (0_u64, 0_u64);
@@ -281,6 +295,8 @@ fn has_control(text: &str) -> bool {
         found |= del.wrapping_sub(ONES) & !del;
         let c2 = word ^ (ONES * 0xc2);
         lead |= c2.wrapping_sub(ONES) & !c2;
+        let e2 = word ^ (ONES * 0xe2);
+        lead |= e2.wrapping_sub(ONES) & !e2;
     };
     let mut bytes = text.as_bytes();
     while let Some((chunk, rest)) = bytes.split_first_chunk::<8>() {
@@ -293,7 +309,7 @@ fn has_control(text: &str) -> bool {
     }
     scan(u64::from_le_bytes(tail));
     let high = ONES * 0x80;
-    found & high != 0 || (lead & high != 0 && text.chars().any(char::is_control))
+    found & high != 0 || (lead & high != 0 && text.chars().any(is_hidden))
 }
 
 /// Writes `value` within `limit` bytes; returns the text and whether it was
@@ -487,7 +503,6 @@ impl ErrorRecord {
     fn from_facts(facts: &probe::Facts<'_>, limits: &RecordLimits) -> ErrorRecord {
         let mut record = ErrorRecord::new(facts.code, facts.severity, facts.category, facts.kinds);
         record.limits = *limits;
-        record.take_public(facts);
         record
     }
 
@@ -497,15 +512,6 @@ impl ErrorRecord {
         self.category = facts.category;
         self.kinds = facts.kinds;
         self.public = Cow::Borrowed(facts.category.default_public_message());
-        self.take_public(facts);
-    }
-
-    fn take_public(&mut self, facts: &probe::Facts<'_>) {
-        if let Some(text) = facts.public {
-            let (kept, cut) = bounded(&text, self.limits.max_message_bytes.min(self.room()));
-            self.public = Cow::Owned(kept);
-            self.truncated |= cut;
-        }
     }
 
     /// The bytes left of `max_total_bytes`.
@@ -697,7 +703,7 @@ impl fmt::Display for ErrorRecord {
             }
             if entry.has_control {
                 for c in entry.message.chars() {
-                    f.write_char(if c.is_control() { ' ' } else { c })?;
+                    f.write_char(if is_hidden(c) { ' ' } else { c })?;
                 }
             } else {
                 f.write_str(&entry.message)?;
@@ -709,16 +715,16 @@ impl fmt::Display for ErrorRecord {
 
 #[cfg(test)]
 mod tests {
-    use super::{bounded, floor_boundary, has_control};
+    use super::{bounded, floor_boundary, has_control, is_hidden};
 
     #[test]
-    fn test_has_control_agrees_with_char_is_control() {
+    fn test_has_control_agrees_with_is_hidden() {
         // Every scalar value under Miri would take hours: there, the ranges
         // around each class only.
         let all = 0..=0x10_FFFF_u32;
         let few = [
             0..=0x100,
-            0x2000..=0x2030,
+            0x2000..=0x2070,
             0xFEFF..=0xFF00,
             0x10_FFF0..=0x10_FFFF,
         ];
@@ -730,12 +736,12 @@ mod tests {
         let mut buffer = [0_u8; 4];
         for c in values.into_iter().filter_map(char::from_u32) {
             let text = c.encode_utf8(&mut buffer);
-            assert_eq!(has_control(text), c.is_control(), "{c:?}");
-            if cfg!(miri) || c.is_control() || u32::from(c) % 97 == 0 {
+            assert_eq!(has_control(text), is_hidden(c), "{c:?}");
+            if cfg!(miri) || is_hidden(c) || u32::from(c) % 97 == 0 {
                 // Across a word boundary, and in the tail.
                 for pad in ["", "a", "abcdefg", "abcdefgh"] {
                     let joined = alloc::format!("{pad}{c}xyz");
-                    assert_eq!(has_control(&joined), c.is_control(), "{c:?} after {pad:?}");
+                    assert_eq!(has_control(&joined), is_hidden(c), "{c:?} after {pad:?}");
                 }
             }
         }
@@ -748,6 +754,17 @@ mod tests {
             "Datei nicht gefunden: /home/jürgen/größe.txt, 5 °C"
         ));
         assert!(has_control("NEL \u{85} after a degree sign °"));
+        assert!(has_control("user \u{202e}nimda\u{202c} not found"));
+        assert!(has_control("an isolate \u{2067}here\u{2069}"));
+        assert!(!has_control(
+            "typography \u{2019}quoted\u{201d} \u{2013} and \u{2026}"
+        ));
+        for c in ['\u{202A}', '\u{202E}', '\u{2066}', '\u{2069}'] {
+            assert!(is_hidden(c), "{c:?}");
+        }
+        for c in ['\u{2029}', '\u{202F}', '\u{2065}', '\u{206A}'] {
+            assert!(!is_hidden(c), "{c:?}");
+        }
     }
 
     #[test]

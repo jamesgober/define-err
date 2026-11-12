@@ -15,8 +15,12 @@
 mod sync {
     pub use loom::{
         cell::UnsafeCell as Cell,
-        sync::atomic::{AtomicU32, AtomicU64 as AtomicKey, Ordering},
+        sync::atomic::{fence, AtomicU32, AtomicU64, AtomicU64 as AtomicKey, Ordering},
     };
+
+    pub fn spin() {
+        loom::thread::yield_now();
+    }
 
     pub type Key = u64;
 
@@ -35,6 +39,8 @@ mod sync {
 
 #[path = "../src/facade/control.rs"]
 mod control;
+#[path = "../src/facade/mask.rs"]
+mod mask;
 #[path = "../src/facade/sites.rs"]
 mod sites;
 #[path = "../src/facade/slot.rs"]
@@ -184,5 +190,56 @@ fn loom_site_table() {
         let other_seen = racer.join().unwrap();
         assert!((seen == Seen::First) != (other_seen == Seen::First));
         assert!(seen == Seen::Full || other_seen == Seen::Full);
+    });
+}
+
+const A: u64 = 0x0000_0001_0000_0002;
+const B: u64 = 0x0000_0004_0000_0008;
+
+/// The split mask: a reader during a write sees the old mask, the new one,
+/// or (after a write that outlasts every try) every bit; never a mix.
+#[test]
+fn loom_split_mask_is_never_torn() {
+    loom::model(|| {
+        let mask = Arc::new(mask::Split::new(A));
+        let writer = {
+            let mask = mask.clone();
+            thread::spawn(move || mask.set(B))
+        };
+        let seen = mask.get();
+        assert!(seen == A || seen == B || seen == u64::MAX, "{seen:#x}");
+        writer.join().unwrap();
+        assert_eq!(mask.get(), B);
+    });
+}
+
+/// Two writers take turns: the mask ends as one of them, whole.
+#[test]
+fn loom_split_mask_writers_take_turns() {
+    loom::model(|| {
+        let mask = Arc::new(mask::Split::new(u64::MAX));
+        let other = {
+            let mask = mask.clone();
+            thread::spawn(move || mask.set(A))
+        };
+        mask.set(B);
+        other.join().unwrap();
+        let end = mask.get();
+        assert!(end == A || end == B, "{end:#x}");
+    });
+}
+
+/// The whole mask, for completeness: one atomic, so nothing to tear.
+#[test]
+fn loom_whole_mask() {
+    loom::model(|| {
+        let mask = Arc::new(mask::Whole::new(A));
+        let writer = {
+            let mask = mask.clone();
+            thread::spawn(move || mask.set(B))
+        };
+        let seen = mask.get();
+        assert!(seen == A || seen == B);
+        writer.join().unwrap();
     });
 }

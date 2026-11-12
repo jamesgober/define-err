@@ -6,7 +6,15 @@
 pub(crate) use core::sync::atomic::AtomicU32 as AtomicKey;
 #[cfg(target_has_atomic = "64")]
 pub(crate) use core::sync::atomic::AtomicU64 as AtomicKey;
-pub(crate) use core::sync::atomic::{AtomicU32, Ordering};
+#[cfg(target_has_atomic = "64")]
+pub(crate) use core::sync::atomic::AtomicU64;
+pub(crate) use core::sync::atomic::{fence, AtomicU32, Ordering};
+
+/// A pause in a retry loop; loom's models yield instead.
+#[inline]
+pub(crate) fn spin() {
+    core::hint::spin_loop();
+}
 
 /// A key of the site table: 64 bits, or 32 on targets without 64-bit atomics.
 #[cfg(target_has_atomic = "64")]

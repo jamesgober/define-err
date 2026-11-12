@@ -85,11 +85,15 @@ The kinds mask is two more `AtomicU32` values, read only after the word says a r
 
 **The guard.** `src/facade/guard.rs`. With `std`, a thread-local flag drops a verb called inside a reporter call and counts it, and `catch_unwind` contains a panic. A payload that panics when dropped is caught too, up to four times, and then leaked.
 
-**Once per site.** `warn!` and `deprecated!` own a static atomic at the call site. `warn` and `deprecated` are functions and cannot, so they use a table of 512 atomic slots in `src/facade/sites.rs`, keyed by a hash of the file name's text, the line, and the column, with linear probing by compare-and-swap. The compiler may emit one location twice, so the key hashes the text and not its address. Past 512 sites a warning delivers every time and `stats()` counts it: more noise, never silence.
+**Once per site.** `warn!` and `deprecated!` own a static atomic at the call site. `warn` and `deprecated` are functions and cannot, so they use a table of 512 atomic slots in `src/facade/sites.rs`, keyed by a hash of the file name's text, the line, and the column, with linear probing by compare-and-swap. The compiler may emit one location twice, so the key hashes the text and not its address. `deprecated(item)` mixes the item's text into the key, so each item warns once at a site. Past 512 sites a warning delivers every time and `stats()` counts it: more noise, never silence.
+
+**The kinds mask.** `src/facade/mask.rs`. One `AtomicU64` where the target has 64-bit atomics. Elsewhere two 32-bit halves under a sequence count: writers take turns through the count, and a reader retries while a write is in progress, so it never combines one write's low half with another's high half. After 64 tries that each overlapped a write it returns every bit set, which can deliver an event the new mask excludes and never drops one.
 
 **No compare-and-swap.** `src/facade/inert.rs` replaces `state`. See [`PLATFORM-NOTES.md`](./PLATFORM-NOTES.md).
 
-`tests/loom.rs` compiles `control.rs`, `slot.rs`, and `sites.rs` under loom, so the models check this code and not a copy.
+`tests/loom.rs` compiles `control.rs`, `slot.rs`, `sites.rs`, and `mask.rs` under loom, so the models check this code and not a copy.
+
+**One copy per build.** The facade's statics belong to one copy of the crate, and before 1.0 every minor version is a separate copy. `Cargo.toml` sets `links = "define_err_facade"` with an empty `build.rs`, so Cargo refuses a build with two copies from 0.10 on (`tests/two_copies.sh`).
 
 ## The probe
 

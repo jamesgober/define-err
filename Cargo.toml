@@ -3,7 +3,7 @@
 # =============================================================================
 [package]
 name    = "define-err"
-version = "0.9.3"
+version = "0.10.0"
 
 # Minimum Supported Rust Version (MSRV)
 # 1.81: the first release with `core::error::Error`, which `no_std` errors and
@@ -11,6 +11,16 @@ version = "0.9.3"
 # its MSRV caps theirs. Edition 2021 follows. See dev/PLAN.md, D-002.
 rust-version = "1.81"
 edition = "2021"
+
+# One facade per build. The reporter, the creation hook, and the filters are
+# statics of one copy of this crate, and before 1.0 every minor version is a
+# separate copy: a crate on another line would report into a slot nobody
+# installed, and nothing would say so. Cargo lets only one package in a build
+# claim a `links` name, so a second copy (0.10 or later) is a resolve error
+# that names both paths. `build.rs` is empty; `links` requires one. See
+# docs/PLATFORM-NOTES.md, "Two copies of define-err".
+links = "define_err_facade"
+build = "build.rs"
 
 # License
 license = "Apache-2.0 OR MIT"

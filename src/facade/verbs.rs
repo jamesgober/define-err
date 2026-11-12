@@ -46,7 +46,9 @@ fn error_event<'a>(verb: Verb, error: &'a (dyn Error + 'static), location: Locat
 /// Delivers a report after the `is_ready` check. Reading the probe calls the
 /// error's own `description()`, so it runs under the guard with the reporter.
 /// A minimum severity is checked from the probe's two digits first, so
-/// dropping an event does not decode the rest.
+/// dropping an event does not decode the rest or call `Display` (the check
+/// `identify` makes, about 16 ns): a forged low severity drops only its own
+/// event, and severity filtering is not a security boundary (D-091).
 fn report_ready(word: Word, error: &(dyn Error + 'static), location: Location) {
     guard::run(|| {
         if state::has_minimum(word)
@@ -139,8 +141,9 @@ pub fn report_with(error: &(dyn Error + 'static), severity: Severity, kinds: Kin
 /// ```
 /// use define_err::{Category, ErrorRecord, Kinds, Severity};
 ///
-/// let record = ErrorRecord::new(None, Severity::ERROR, Category::Internal, Kinds::ERROR);
-/// if define_err::is_installed() {
+/// // Ask the filters first, so a dropped report builds nothing.
+/// if define_err::would_deliver(Severity::ERROR, Kinds::ERROR) {
+///     let record = ErrorRecord::new(None, Severity::ERROR, Category::Internal, Kinds::ERROR);
 ///     define_err::report_record(&record);
 /// }
 /// ```
@@ -258,6 +261,8 @@ pub fn notice_with(kinds: Kinds, message: &str) {
 enum Memory<'a> {
     Site(&'a Site),
     Table,
+    /// The table, keyed by the site and an item, so each item warns once.
+    Item(&'a str),
 }
 
 impl Memory<'_> {
@@ -265,6 +270,7 @@ impl Memory<'_> {
         match self {
             Memory::Site(site) => state::site_fires(site),
             Memory::Table => state::table_fires(location),
+            Memory::Item(item) => state::item_fires(location, item),
         }
     }
 }
@@ -323,7 +329,7 @@ fn deprecated_text(item: &str, location: Location) {
         Kinds::DEPRECATED | Kinds::WARNING,
         format_args!("`{item}` is deprecated"),
         location,
-        Memory::Table,
+        Memory::Item(item),
     );
 }
 
@@ -432,12 +438,17 @@ pub fn trigger(kinds: Kinds, message: &str) {
 
 /// A run-time deprecation warning for anything that is not a Rust item (a
 /// configuration key, a protocol field): kinds `DEPRECATED | WARNING`,
-/// severity `WARNING`, once per call site like [`warn`].
+/// severity `WARNING`, once per item at each call site, so one call in a
+/// loop over a file's keys reports every deprecated key once. The table
+/// [`warn`] uses holds 512 entries; past that, every call delivers and
+/// [`stats`](crate::stats) counts it.
 ///
 /// # Examples
 ///
 /// ```
-/// define_err::deprecated("pool.max");
+/// for key in ["pool.max", "pool.min", "pool.max"] {
+///     define_err::deprecated(key); // "pool.max" and "pool.min", once each
+/// }
 /// ```
 #[track_caller]
 #[inline]

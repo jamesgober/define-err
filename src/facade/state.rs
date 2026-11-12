@@ -2,14 +2,16 @@
 //! the once-per-site table, and the counters. `inert.rs` has the same items
 //! for targets without compare-and-swap.
 
-use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering::Relaxed};
+use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
 pub(crate) use super::control::Word;
 pub use super::sites::Site;
 use super::{
     control::{Control, HOOK_STATE, REPORTER_STATE},
-    sites::{key, Seen, SiteTable},
+    mask::Mask,
+    sites::{item_key, key, Seen, SiteTable},
     slot::WriteOnce,
+    sync::Key,
     CreationHook, FacadeStats, Reporter, WarnMode,
 };
 use crate::{Kinds, Location, Severity};
@@ -20,8 +22,7 @@ const SITES: usize = 512;
 static CONTROL: Control = Control::new();
 static REPORTER: WriteOnce<dyn Reporter> = WriteOnce::new();
 static HOOK: WriteOnce<dyn CreationHook> = WriteOnce::new();
-static MASK_LOW: AtomicU32 = AtomicU32::new(u32::MAX);
-static MASK_HIGH: AtomicU32 = AtomicU32::new(u32::MAX);
+static MASK: Mask = Mask::new(u64::MAX);
 static TABLE: SiteTable<SITES> = SiteTable::new();
 static OVERFLOW: AtomicUsize = AtomicUsize::new(0);
 static REENTRANT: AtomicUsize = AtomicUsize::new(0);
@@ -115,19 +116,33 @@ pub(crate) fn min_severity() -> Option<Severity> {
 }
 
 pub(crate) fn set_kinds_mask(mask: Kinds) {
-    MASK_LOW.store(mask.bits() as u32, Relaxed);
-    MASK_HIGH.store((mask.bits() >> 32) as u32, Relaxed);
+    MASK.set(mask.bits());
 }
 
+/// The mask, read whole: never one write's low half with another's high.
 #[inline]
 pub(crate) fn kinds_mask() -> Kinds {
-    Kinds::from_bits(u64::from(MASK_LOW.load(Relaxed)) | u64::from(MASK_HIGH.load(Relaxed)) << 32)
+    Kinds::from_bits(MASK.get())
 }
 
 /// Whether a function-form site gets to deliver. A full table delivers every
 /// time and counts it, so a warning is never lost to the table.
 pub(crate) fn table_fires(location: Location) -> bool {
-    match TABLE.check(key(location.file(), location.line(), location.column())) {
+    table_fires_key(key(location.file(), location.line(), location.column()))
+}
+
+/// `table_fires` for one item at a site (`deprecated(item)`).
+pub(crate) fn item_fires(location: Location, item: &str) -> bool {
+    table_fires_key(item_key(
+        location.file(),
+        location.line(),
+        location.column(),
+        item,
+    ))
+}
+
+fn table_fires_key(key: Key) -> bool {
+    match TABLE.check(key) {
         Seen::First => true,
         Seen::Again => false,
         Seen::Full => {

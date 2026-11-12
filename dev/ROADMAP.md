@@ -1,7 +1,7 @@
 # define-err - Roadmap
 
 > Path from scaffold to a stable 1.0. Each phase has hard exit criteria and ends with the release routine (bump, CHANGELOG, release notes, local gate, push, green CI, tag, GitHub release, `cargo doc`, `cargo publish`).
-> Design, API item ids (ROOT-, DEF-, CODE-, SEV-, CAT-, KND-, INF-, PRB-, SEC-, FAC-, REC-, TST-), requirements (FR-, NFR-), threats (T1 to T17), and edge cases (E-1 to E-100): [`PLAN.md`](./PLAN.md).
+> Design, API item ids (ROOT-, DEF-, CODE-, SEV-, CAT-, KND-, INF-, PRB-, SEC-, FAC-, REC-, TST-), requirements (FR-, NFR-), threats (T1 to T18), and edge cases (E-1 to E-100): [`PLAN.md`](./PLAN.md).
 >
 > **Anti-deferral rule:** no listed task moves to a later phase unless this file records the move and the reason, with a decision-log entry in `PLAN.md`. P0 items ship in the version listed and never move.
 >
@@ -79,6 +79,7 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
 - [x] `0.9.1` released (2026-11-08): `Code` `Display` about 10% faster and the control-character scan four times faster (D-084, D-085); the D-060 run-time misses looked at again, with what stays and why in D-084.
 - [x] `0.9.2` released (2026-11-08): enums read 32 variants per macro step, with variant attributes in any order and unnamed tuple fields, so 500 variants of those forms compile at the default `recursion_limit` (D-087); a 1,000-variant enum with metadata expands in 6 s instead of 28.
 - [x] `0.9.3` released (2026-11-09): the duplicate-code check sorts the numbers instead of comparing every pair (D-088), so a 1,000-variant enum with codes builds in 21.9 s of CPU instead of 24.9; the 1.0 stability draft, `docs/STABILITY-1.0.md`.
+- [x] `0.10.0` released (2026-11-11), the fixes from an independent review, a breaking release with a migration note: outside text in std's string errors can no longer pass for a probe or reach `ErrorRecord.public` (D-091); a second copy of the crate in one build is a resolve error (D-092); the kinds mask is read whole (D-093); `deprecated(item)` warns once per item (D-094); `catalog::Catalog` indexes catalogs (D-095); the review's three notes (D-096). report-err, noml-rust, and mod-cli move to 0.10 together.
 - [ ] Migrate noml-rust and mod-cli (draft PRs open); config-lib's path decided with James (`PLAN.md` 19.4).
 - [ ] L2 builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite; L3 reads codes through the probe.
 - [ ] **James's pre-1.0 review**, before the API is frozen; anything he adds goes into this roadmap before 1.0.
@@ -86,7 +87,7 @@ Exit: API unchanged across the last release candidate; L2 and L3 owners sign off
   - revisit every accepted gap, deferred item, known issue, and missed target recorded in `PLAN.md` section 20 and in this roadmap, and fix it or record why it stays;
   - a fresh performance tuning pass against `PLAN.md` 11.1, with new measurements in `docs/PERFORMANCE.md`, on a quiet machine: the 0.6 numbers were taken at a load average of 47;
   - the misses reviewed in D-060, the incremental rebuild and the 500-variant enum first: cut the per-variant work for a type with metadata as D-059 did for a plain one;
-  - re-run the security review (threats T1 to T17, attack tests, fuzz) and the edge-case review (E-1 to E-100 plus every case added since).
+  - re-run the security review (threats T1 to T18, attack tests, fuzz) and the edge-case review (E-1 to E-100 plus every case added since).
   Nothing accepted earlier in the series becomes final silently: whatever is still open goes into the 1.0 readiness note for James.
 - [ ] Release candidates `0.9.x` until no API change is needed for two weeks of use.
 - [x] `docs/STABILITY-1.0.md` drafted with the requirement-to-test map (`tests/TRACEABILITY.md`) (2026-11-08, D-086): what 1.x keeps and how each promise is checked, the MSRV rule, what is not covered, and an empty audit record; the support window waits on James (J-4).
