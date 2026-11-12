@@ -1,6 +1,6 @@
 # define-err - 1.0 readiness
 
-> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-09, at 0.9.3.
+> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-12, at 0.10.0.
 
 ## Decisions for James
 
@@ -18,7 +18,7 @@
 | 1. P0 to P2 items implemented, documented, tested | Done at 0.5; re-checked in the 0.9 audit. |
 | 2. Every FR and NFR has a named test (`tests/TRACEABILITY.md`) | Done in 0.9: every requirement is mapped. NFR-2, NFR-4, and NFR-5 are checked by measurement and NFR-13 by review, not by CI. |
 | 3. E-1 to E-100 pass | Done; the 0.9 edge-case review re-runs them and the cases added since. |
-| 4. T1 to T17 attack tests, costs stated | Done at 0.7; they pass on every push. The 0.9 review of the run-time code changed since 0.7 (`short_file`, path display, the code checks) found D-081, fixed. |
+| 4. T1 to T18 attack tests, costs stated | Done at 0.7; they pass on every push. The 0.9 review of the run-time code changed since 0.7 (`short_file`, path display, the code checks) found D-081, fixed. The independent review of 0.9.3 found two medium and three low findings and three notes, all fixed in 0.10 (D-091 to D-096); T18 (two copies of the crate) is new. |
 | 5. Fuzz, 24 hours per target, no open finding | Done at 0.7 (D-066). The one new run-time parser since, `short_file`, has a property test (`prop_short_file_is_a_suffix_and_keeps_relative_paths`) in place of a fuzz target. |
 | 6. loom, Miri, 8-hour soak | Done at 0.7; Miri also passes over 0.8. |
 | 7. Counting-allocator proofs | Done. |
@@ -44,6 +44,8 @@
 | 500-variant rebuild +11% from path display | D-067 | Kept for thiserror parity; re-measured with the tuning pass. |
 | Early severity read drops a malformed low-severity probe | D-063 | Kept: severity filtering is not a security boundary (`docs/SECURITY.md`). |
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
-| A crate past 1.0 takes define-err as a public dependency | D-070 | Policy recorded; the semver trick is carried out at 1.0. |
+| A crate past 1.0 takes define-err as a public dependency | D-070, D-092 | Policy recorded; the semver trick is carried out at 1.0, so a 1.x and a 2.x share one facade. Until then `links` refuses a second copy from 0.10 on. |
+| `identify` on a generated type, 38 ns with the `Display` check (26 before) | D-091 | Kept: the check is what refuses outside text shaped like a probe on Rust 1.81 to 1.89; it stays off the filtered `report` path. |
+| A forged low severity in outside text can drop its own event | D-063, D-091 | Kept: severity filtering is not a security boundary, and the check would cost every filtered `report` 16 ns. The event claims nothing when it is delivered. |
 | kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
-| Source size: 5,507 lines of code against a 5,000 target | NFR-14, D-080, D-087, D-088 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
+| Source size: 5,706 lines of code against a 5,000 target | NFR-14, D-080, D-087, D-088, D-091 to D-096 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |

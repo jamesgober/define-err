@@ -725,7 +725,6 @@ macro_rules! __define_err_probe {
             $crate::Kinds::bits($crate::__define_err_value!(@kinds [$($kinds)?])),
             $transparent,
             $($tname)*,
-            __DEFINE_ERR_PUBLIC,
         );
         const __DEFINE_ERR_TEXT: &str = __DEFINE_ERR_PROBE.as_str();
         __DEFINE_ERR_TEXT

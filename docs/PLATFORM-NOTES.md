@@ -70,6 +70,12 @@ Nothing in the facade allocates. `ErrorRecord` allocates and is bounded by `Reco
 
 `Code` is a `u64` on every target, so codes and probes do not change between 32-bit and 64-bit builds. Facade counters in `stats()` are `u64` in the API and may wrap at 32 bits on a 32-bit target, which affects only the counts.
 
-## Probe stability across versions
+## Two copies of define-err
 
-Two versions of this crate in one process each have their own facade slot, and read each other's probes. An application with two major versions of `define-err` needs a reporter installed in each. Cargo's unification makes this rare within one major version, where there is one slot.
+Cargo builds one copy of a crate per semver-incompatible version, and before 1.0 every minor version (0.9, 0.10, 0.11) is incompatible with the others. Each copy has its own reporter slot, creation hook, minimum severity, kinds mask, and `warn()` table. An application installs its reporter into the copy it names, so events sent through any other copy would reach no reporter, and nothing would show it.
+
+From 0.10, a second copy is a build error instead. `Cargo.toml` sets `links = "define_err_facade"`, and Cargo allows one package per `links` name in a build, so a graph that needs 0.10 and 0.11 together fails to resolve, naming both paths. The fix is to move every dependency to one line. Copies from 0.9 and older do not set `links`, so Cargo cannot refuse them; `cargo tree -d -i define-err` lists every copy in a build.
+
+Probes read across copies: 0.10 decodes a 0.9 probe (and ignores the public message 0.9 probes carried). Codes, categories, and kinds are the same, and events are not.
+
+At 1.0 the facade's statics move to one version that later major lines forward to (the pattern `log` 0.3 used for 0.4), so a 1.x and a 2.x share one slot. Only that version keeps `links`.

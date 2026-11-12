@@ -181,6 +181,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Package
         run: cargo package
+      # `links = "define_err_facade"`: a build with two copies must not resolve.
+      - name: Two copies are refused
+        run: bash tests/two_copies.sh
 
   security:
     name: Security (audit + deny)

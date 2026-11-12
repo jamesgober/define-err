@@ -1,0 +1,23 @@
+error: define_errors!: generic type and lifetime parameters are not supported; see "Limits" in docs/API.md
+ --> tests/ui/generic_type.rs:3:1
+  |
+3 | / define_errors! {
+4 | |     pub enum E<T> {
+5 | |         Bad(inner: T) => "bad",
+6 | |     }
+7 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `$crate::__define_err_type` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: define_errors!: generic type and lifetime parameters are not supported; see "Limits" in docs/API.md
+  --> tests/ui/generic_type.rs:9:1
+   |
+ 9 | / define_errors! {
+10 | |     pub struct S<'a> {
+11 | |         name: &'a str,
+12 | |     } => "bad {name}";
+13 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `$crate::__define_err_type` which comes from the expansion of the macro `define_errors` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -283,6 +283,57 @@ fn test_deprecated_messages_and_once_per_site() {
     assert_eq!(events[0].severity, Severity::WARNING);
 }
 
+/// `would_deliver` answers what `report_record` would do with a record of
+/// that severity and those kinds, under each filter.
+#[test]
+fn test_would_deliver_follows_the_filters() {
+    let _serial = serial();
+    assert!(define_err::would_deliver(Severity::ERROR, Kinds::ERROR));
+    assert!(define_err::would_deliver(Severity::DEBUG, Kinds::NONE));
+    define_err::set_min_severity(Some(Severity::WARNING));
+    assert!(!define_err::would_deliver(Severity::NOTICE, Kinds::ERROR));
+    assert!(define_err::would_deliver(Severity::WARNING, Kinds::ERROR));
+    define_err::set_kinds_mask(Kinds::SECURITY);
+    assert!(!define_err::would_deliver(Severity::ERROR, Kinds::ERROR));
+    assert!(!define_err::would_deliver(Severity::ERROR, Kinds::NONE));
+    assert!(define_err::would_deliver(
+        Severity::ERROR,
+        Kinds::ERROR | Kinds::SECURITY
+    ));
+    #[cfg(feature = "alloc")]
+    {
+        let record =
+            define_err::ErrorRecord::new(None, Severity::ERROR, Category::Internal, Kinds::ERROR);
+        define_err::report_record(&record);
+        assert!(RECORDER.take().is_empty());
+    }
+}
+
+/// One `deprecated` call in a loop over a file's keys reports each key once,
+/// and a repeat of a key stays quiet.
+#[test]
+fn test_deprecated_function_is_once_per_item() {
+    fn check(keys: &[&str]) {
+        for key in keys {
+            define_err::deprecated(key);
+        }
+    }
+    let _serial = serial();
+    check(&["pool.max", "pool.min", "pool.idle", "pool.max"]);
+    check(&["pool.min", "pool.size"]);
+    let events = RECORDER.take();
+    let messages: Vec<&str> = events.iter().map(|e| e.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        [
+            "`pool.max` is deprecated",
+            "`pool.min` is deprecated",
+            "`pool.idle` is deprecated",
+            "`pool.size` is deprecated",
+        ]
+    );
+}
+
 /// E-75: `Always`, then `Once`.
 #[test]
 fn test_mode_always_then_once() {

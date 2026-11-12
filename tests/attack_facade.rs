@@ -111,6 +111,44 @@ fn test_forged_severity_can_only_drop_its_own_event() {
     assert_eq!(RECORDER.take().len(), 1);
 }
 
+/// An error that displays the text its `description()` returns, as std's
+/// string errors do on Rust 1.81 to 1.89 (`io::Error::other(String)`,
+/// `Box<dyn Error>::from(String)`).
+#[derive(Debug)]
+struct Spoken(String);
+
+impl fmt::Display for Spoken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl Error for Spoken {
+    fn description(&self) -> &str {
+        &self.0
+    }
+}
+
+/// T11: outside text shaped like a probe, in a foreign error that displays
+/// it or in std's string errors, is delivered as a foreign error: it claims
+/// no code, no severity, and no `SECURITY`.
+#[test]
+fn test_spoken_probe_claims_nothing() {
+    let _serial = serial();
+    let text = probe_of(&Audit::Breach);
+    define_err::report(&Spoken(text.clone()));
+    define_err::report(&std::io::Error::other(text.clone()));
+    let boxed: Box<dyn Error + Send + Sync> = text.into();
+    define_err::report(&*boxed);
+    let events = RECORDER.take();
+    assert_eq!(events.len(), 3);
+    for event in events {
+        assert_eq!(event.code, None);
+        assert_eq!(event.severity, Severity::ERROR);
+        assert!(!event.kinds.contains(Kinds::SECURITY));
+    }
+}
+
 /// T11: a malformed probe claims nothing. It is a foreign error.
 #[test]
 fn test_malformed_probe_loses_its_claims() {

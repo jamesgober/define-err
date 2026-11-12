@@ -423,13 +423,19 @@ impl fmt::Display for UrlDisplay<'_> {
 
 /// Searching and checking catalogs from several crates, without a registry.
 pub mod catalog {
+    #[cfg(feature = "alloc")]
+    use alloc::{boxed::Box, vec::Vec};
     use core::fmt;
 
     use crate::{Code, CodeInfo};
 
     /// The first entry with `code` in `catalogs`, searched in order.
     ///
-    /// Linear in the number of entries [est. under 1 us for 1,000 codes].
+    /// Linear in the number of entries: right for one crate's catalog or a
+    /// lookup now and then [measured: 2.4 ns for two codes; est. 3 us at
+    /// 1,000 and 30 us at 10,000 for a code near the end]. An application
+    /// that looks codes up across every crate's catalog builds a `Catalog`
+    /// (with `alloc`) once instead.
     ///
     /// # Examples
     ///
@@ -451,12 +457,16 @@ pub mod catalog {
     /// Checks that no code appears twice across `catalogs`: the boot-time
     /// check across crates. Retired entries count as taken.
     ///
-    /// Quadratic in the number of entries and allocation-free [est. under
-    /// 1 ms for 1,000 codes, once at boot].
+    /// With `alloc`, a sort of references and one pass, O(n log n) [est.
+    /// 1 ms at 10,000 codes, once at boot]. Without it, allocation-free and
+    /// quadratic [est. 0.25 ms at 1,000 codes]. When codes collide more than
+    /// once, the smallest colliding code is the one named (with `alloc`), or
+    /// the first in order (without).
     ///
     /// # Errors
     ///
-    /// [`DuplicateCode`] naming the code and the two entries' type names.
+    /// [`DuplicateCode`] naming the code and the two entries' type names, in
+    /// the order the catalogs list them.
     ///
     /// # Examples
     ///
@@ -472,6 +482,17 @@ pub mod catalog {
     /// assert_eq!(err.second, "StoreError::Busy");
     /// ```
     pub fn check_unique(catalogs: &[&'static [CodeInfo]]) -> Result<(), DuplicateCode> {
+        #[cfg(feature = "alloc")]
+        {
+            Catalog::new(catalogs).map(|_| ())
+        }
+        #[cfg(not(feature = "alloc"))]
+        check_pairs(catalogs)
+    }
+
+    /// `check_unique` without a buffer: every entry against every later one.
+    #[cfg(any(not(feature = "alloc"), test))]
+    pub(crate) fn check_pairs(catalogs: &[&'static [CodeInfo]]) -> Result<(), DuplicateCode> {
         let mut entries = catalogs.iter().flat_map(|entries| entries.iter());
         while let Some(first) = entries.next() {
             if let Some(second) = entries.clone().find(|other| other.code == first.code) {
@@ -483,6 +504,89 @@ pub mod catalog {
             }
         }
         Ok(())
+    }
+
+    /// Several crates' catalogs indexed once, for lookups by code in
+    /// O(log n) [est. under 50 ns at 10,000 codes]. Building it checks that
+    /// no code appears twice, as [`check_unique`] does, so the one call at
+    /// boot both fails closed on a collision and gives the index.
+    ///
+    /// It holds one reference per entry (8 bytes on a 64-bit target), sorted
+    /// by code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use define_err::{catalog::Catalog, code, CodeInfo};
+    ///
+    /// const DB: &[CodeInfo] = &[CodeInfo::new(code!("DB", 1), "Timeout", "Raise pool.size.")];
+    /// const NET: &[CodeInfo] = &[CodeInfo::new(code!("NET", 4), "Refused", "Check the peer.")];
+    ///
+    /// let catalog = Catalog::new(&[DB, NET])?;
+    /// assert_eq!(catalog.find(code!("NET", 4)).unwrap().title, "Refused");
+    /// assert!(catalog.find(code!("DB", 2)).is_none());
+    /// assert_eq!(catalog.len(), 2);
+    /// # Ok::<(), define_err::catalog::DuplicateCode>(())
+    /// ```
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+    #[derive(Clone, Debug)]
+    pub struct Catalog {
+        entries: Box<[&'static CodeInfo]>,
+    }
+
+    #[cfg(feature = "alloc")]
+    impl Catalog {
+        /// Indexes `catalogs`, or names the first code (the smallest) that
+        /// two entries share. Retired entries count as taken. One sort of
+        /// references [est. 1 ms at 10,000 codes].
+        ///
+        /// # Errors
+        ///
+        /// [`DuplicateCode`] naming the code and the two entries' type names,
+        /// in the order the catalogs list them.
+        pub fn new(catalogs: &[&'static [CodeInfo]]) -> Result<Catalog, DuplicateCode> {
+            let mut entries: Vec<&'static CodeInfo> =
+                catalogs.iter().flat_map(|entries| entries.iter()).collect();
+            // Stable, so entries with the same code keep the catalogs' order.
+            entries.sort_by_key(|entry| entry.code);
+            if let Some(pair) = entries.windows(2).find(|pair| pair[0].code == pair[1].code) {
+                return Err(DuplicateCode {
+                    code: pair[0].code,
+                    first: pair[0].type_name,
+                    second: pair[1].type_name,
+                });
+            }
+            Ok(Catalog {
+                entries: entries.into_boxed_slice(),
+            })
+        }
+
+        /// The entry with `code`, by binary search.
+        #[must_use]
+        pub fn find(&self, code: Code) -> Option<&'static CodeInfo> {
+            self.entries
+                .binary_search_by_key(&code, |entry| entry.code)
+                .ok()
+                .map(|index| self.entries[index])
+        }
+
+        /// How many entries it holds, retired ones included.
+        #[must_use]
+        pub fn len(&self) -> usize {
+            self.entries.len()
+        }
+
+        /// Whether it holds no entry.
+        #[must_use]
+        pub fn is_empty(&self) -> bool {
+            self.entries.is_empty()
+        }
+
+        /// Every entry, by code.
+        pub fn iter(&self) -> impl Iterator<Item = &'static CodeInfo> + '_ {
+            self.entries.iter().copied()
+        }
     }
 
     /// Two catalog entries with the same code.
@@ -603,6 +707,71 @@ mod tests {
         let err = catalog::check_unique(&[&ONE, &ONE]).unwrap_err();
         assert_eq!(err.code, code(1));
         assert!(err.to_string().contains("a retired entry"));
+        assert!(catalog::check_pairs(&[&ONE]).is_ok());
+        assert_eq!(
+            catalog::check_pairs(&[&ONE, &ONE]).unwrap_err().code,
+            code(1)
+        );
+    }
+
+    /// The index finds what the linear search finds, and refuses what the
+    /// pairwise check refuses, over catalogs in any order.
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn test_index_agrees_with_the_linear_forms() {
+        /// A catalog entry, in a `static`: `Catalog` takes `'static` parts.
+        const fn entry(n: u32, name: &'static str) -> CodeInfo {
+            let code = match crate::Namespace::try_new("DB") {
+                Ok(ns) => match ns.code(n) {
+                    Some(c) => c,
+                    None => panic!(),
+                },
+                Err(_) => panic!(),
+            };
+            CodeInfo::new(code, "t", "h").with_type_name(name)
+        }
+        static A: [CodeInfo; 4] = [
+            entry(9, "A"),
+            entry(3, "A"),
+            entry(700, "A"),
+            entry(41, "A"),
+        ];
+        static B: [CodeInfo; 3] = [entry(1, "B"), entry(8000, "B"), entry(42, "B")];
+        static C: [CodeInfo; 2] = [entry(42, "C"), entry(5, "C")];
+        let (a, b, c): (
+            &'static [CodeInfo],
+            &'static [CodeInfo],
+            &'static [CodeInfo],
+        ) = (&A, &B, &C);
+        let index = catalog::Catalog::new(&[a, b]).unwrap();
+        assert_eq!(index.len(), 7);
+        assert!(index
+            .iter()
+            .zip(index.iter().skip(1))
+            .all(|(x, y)| x.code < y.code));
+        // Every number under Miri would take minutes; there, a stride that
+        // still lands on the entries and around them.
+        let numbers: std::vec::Vec<u32> = if cfg!(miri) {
+            [
+                0, 1, 2, 3, 4, 5, 9, 10, 41, 42, 43, 700, 701, 7999, 8000, 8001,
+            ]
+            .into()
+        } else {
+            (0..9000).collect()
+        };
+        for n in numbers {
+            let found = index.find(code(n)).map(|e| e.type_name);
+            let linear = catalog::find(&[a, b], code(n)).map(|e| e.type_name);
+            assert_eq!(found, linear, "{n}");
+        }
+        let err = catalog::Catalog::new(&[a, b, c]).unwrap_err();
+        assert_eq!((err.code, err.first, err.second), (code(42), "B", "C"));
+        let pairs = catalog::check_pairs(&[a, b, c]).unwrap_err();
+        assert_eq!(
+            (pairs.code, pairs.first, pairs.second),
+            (code(42), "B", "C")
+        );
+        assert!(catalog::Catalog::new(&[]).unwrap().is_empty());
     }
 
     #[test]

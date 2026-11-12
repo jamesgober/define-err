@@ -11,12 +11,93 @@
 
 ## [Unreleased]
 
+---
+
+## [0.10.0] - 2026-11-12
+
+Fixes from an independent review. Outside text can no longer pass for a
+generated error's identity or reach a record's public message, and a build
+can hold only one copy of the crate's facade. A breaking release: see
+"Migrating from 0.9" below.
+
+### Security
+
+- On Rust 1.81 to 1.89, std's string errors (`io::Error::other(String)`,
+  `io::Error::new(kind, String)`, `Box<dyn Error>::from(String)`) return their
+  message from `description()`, so a peer's error text shaped like a probe was
+  read as a generated error: any code, category, severity, and kinds, and a
+  public message that `ErrorRecord.public` carried as client-safe text. Now:
+  - the probe carries no public message, and a record built from
+    `&dyn Error` sets `public` to the category's sentence;
+  - `identify` refuses an error whose `Display` also begins with the probe's
+    magic, which a generated type never does;
+  - records and the facade check `io::Error` before the probe.
+  The CI job on Rust 1.81 runs the test that fails without these.
+- A second copy of define-err in one build is a resolve error from 0.10 on
+  (`links = "define_err_facade"`, an empty `build.rs`). Every 0.x minor has
+  its own reporter slot, so events sent through another copy reached no
+  reporter, and nothing showed it.
+- The kinds mask is read whole. It was two 32-bit halves, so a verb that ran
+  during `set_kinds_mask` could filter with half of each mask and drop an
+  event that both masks pass. 64-bit targets use one atomic; others a
+  sequence lock that never blocks a verb.
+- `ChainEntry::has_control` and the record's one-line `Display` cover the
+  bidirectional embeddings, overrides, and isolates (U+202A to U+202E,
+  U+2066 to U+2069), which a log viewer uses to reorder a line.
+
+### Added
+
+- `catalog::Catalog` (`alloc`): several crates' catalogs indexed once, with
+  `find` by binary search. `Catalog::new` checks for duplicate codes, so one
+  call at boot fails closed and gives the index.
+- `would_deliver(severity, kinds)`: whether an event would reach the reporter
+  now, for a caller that would otherwise build a record only to have it
+  dropped.
+
 ### Changed
 
+- `deprecated(item)` warns once per item at each call site, so one call in a
+  loop over a configuration file's keys reports every deprecated key. It was
+  once per call site, which reported only the first. `deprecated!` and
+  `warn` are unchanged.
+- `catalog::check_unique` sorts with `alloc` (O(n log n)); when codes collide
+  more than once, it names the smallest. Without `alloc` it compares pairs as
+  before.
+- A generic or lifetime-parameterised type in `define_errors!` gets a message
+  that says so, instead of one about metadata attributes.
+- `identify` on a generated type costs about 16 ns more (38 ns floor), for
+  the `Display` check. A filtered `report` does not make it.
 - `docs/API.md` gives the measured cost of each operation from
-  `docs/PERFORMANCE.md` in place of the estimates written before 0.6. Several
-  estimates were low: a filtered `report` is 5.7 ns, not 3, and `identify` on a
-  generated type is 26 ns, not 10. No code changed.
+  `docs/PERFORMANCE.md` in place of the estimates written before 0.6.
+
+### Removed
+
+- `Identity::has_public` and `Identity::public`. Through `&dyn Error`, the
+  text could be a forger's. Use `ErrorInfo::public_message()` on the typed
+  value, or the code's catalog entry.
+
+### Generated code
+
+- The probe no longer sets flag bit 0 or appends `|` and the public message.
+  `__private::ProbeBuf::new` loses its last argument (`public`), and
+  `__private::probe_len` keeps its signature and its 512-byte check of the
+  public message but no longer counts it. The decoder still accepts a 0.9
+  probe and ignores its text. `docs/GENERATED-CODE.md` and
+  `tests/golden/probe.txt` have the new layout.
+
+### Migrating from 0.9
+
+- Move every crate in the build to 0.10 at once: Cargo now refuses two
+  copies from 0.10 on. Copies from 0.9 and older are not refused; find them
+  with `cargo tree -d -i define-err`.
+- Replace `identity.public` with `err.public_message()` on the typed value,
+  or with the `public` field of the code's `CodeInfo`
+  (`catalog::Catalog::find`). Drop `identity.has_public`.
+- A record's `public` built from `&dyn Error` is now the category's
+  sentence. To keep a variant's own `#[public]`, set it from the typed
+  value: `record.public = err.public_message().into()`.
+- Code that counted on `deprecated(item)` reporting only once per call site
+  now sees one event per distinct item.
 
 ---
 
@@ -489,7 +570,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/jamesgober/define-err/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/jamesgober/define-err/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/jamesgober/define-err/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/jamesgober/define-err/compare/v0.9.0...v0.9.1

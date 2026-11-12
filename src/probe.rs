@@ -12,15 +12,24 @@
 //! 20      2       severity in lowercase hex (01-18)
 //! 22      2       category gRPC number in lowercase hex (01-10)
 //! 24      16      kinds bits in lowercase hex
-//! 40      2       flags in lowercase hex: bit 0 public message, bit 1 transparent
+//! 40      2       flags in lowercase hex: bit 1 transparent
 //! 42      1       '|'
 //! 43      1-128   type name, ASCII
-//! then, only when flag bit 0 is set:
-//!         1       '|'
-//!         0-512   the public message, UTF-8
 //! ```
+//!
+//! Flag bit 0 is retired. Probes from 0.9 and older set it and append `|`
+//! and the variant's public message; the decoder still accepts them and
+//! ignores the text. A probe proves nothing about who wrote it
+//! (`docs/SECURITY.md`, "Forged probes"), so text read through `&dyn Error`
+//! is never treated as client-safe.
+//!
+//! A probe counts only when the error's `Display` does not also begin with
+//! the magic. A generated type displays its message, never its probe; an
+//! error that displays the probe is carrying outside text, as std's string
+//! errors do on Rust 1.81 to 1.89, whose `description()` returns their
+//! message.
 
-use core::error::Error;
+use core::{error::Error, fmt};
 
 use crate::{Category, Code, Kinds, Severity};
 
@@ -30,7 +39,7 @@ pub(crate) const MAGIC: &[u8; 4] = b"\0DE1";
 pub(crate) const HEADER: usize = 43;
 /// The longest type name a probe carries.
 pub(crate) const MAX_NAME: usize = 128;
-/// The longest public message a probe carries.
+/// The longest public message an older (0.9 or earlier) probe carries.
 pub(crate) const MAX_PUBLIC: usize = 512;
 
 /// What a probe says about an error.
@@ -69,11 +78,6 @@ pub struct Identity<'a> {
     pub category: Category,
     /// The variant's kinds.
     pub kinds: Kinds,
-    /// Whether the variant wrote its own public message (otherwise the
-    /// category's default applies).
-    pub has_public: bool,
-    /// The variant's own `#[public]` message, if it wrote one.
-    pub public: Option<&'a str>,
     /// Whether this is a transparent wrapper whose inner value has no probe.
     pub transparent: bool,
     /// `"Type::Variant"`, or `"Type"` for a struct.
@@ -85,9 +89,14 @@ pub struct Identity<'a> {
 ///
 /// A foreign error is rejected after one comparison of four bytes. Every
 /// field is validated (code layout, severity range, category range, ASCII
-/// name); a malformed probe is `None`. No allocation; about 26 ns for a
-/// generated type and 2 ns for a foreign one (`docs/PERFORMANCE.md`). Codes
-/// identify an error; they do not authenticate it.
+/// name); a malformed probe is `None`. An error whose `Display` also begins
+/// with the magic is `None`: that is outside text shaped like a probe (std's
+/// string errors return their message from `description()` on Rust 1.81 to
+/// 1.89). The check is one `Display` call that stops after four bytes, made
+/// only for a probe that is otherwise valid. No allocation; for a generated
+/// type about 38 ns, of which the `Display` check is 16, and 2 ns for a
+/// foreign one (`docs/PERFORMANCE.md`). Codes identify an error; they do not
+/// authenticate it.
 ///
 /// # Examples
 ///
@@ -102,7 +111,48 @@ pub struct Identity<'a> {
 pub fn identify<'a>(error: &'a (dyn Error + 'static)) -> Option<Identity<'a>> {
     #[allow(deprecated)]
     let text = error.description();
-    decode(text)
+    if text.as_bytes().first_chunk::<4>() != Some(MAGIC) {
+        return None;
+    }
+    // Validated first, so a malformed probe never costs the `Display` call.
+    let identity = decode_fields(text)?;
+    (!displays_magic(error)).then_some(identity)
+}
+
+/// Keeps the first four bytes written to it, then refuses, which ends the
+/// `Display` writing to it.
+struct Prefix {
+    bytes: [u8; 4],
+    len: usize,
+}
+
+impl fmt::Write for Prefix {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        for &byte in text.as_bytes() {
+            if self.len == 4 {
+                return Err(fmt::Error);
+            }
+            self.bytes[self.len] = byte;
+            self.len += 1;
+        }
+        if self.len == 4 {
+            Err(fmt::Error)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Whether `error` displays text that begins with the probe magic: outside
+/// text, never a generated type, whose `Display` is its message.
+#[inline(never)]
+pub(crate) fn displays_magic(error: &(dyn Error + 'static)) -> bool {
+    let mut prefix = Prefix {
+        bytes: [0; 4],
+        len: 0,
+    };
+    let _ = fmt::write(&mut prefix, format_args!("{error}"));
+    prefix.len == 4 && &prefix.bytes == MAGIC
 }
 
 /// What the facade and `ErrorRecord` use of an error held as `&dyn Error`.
@@ -113,23 +163,13 @@ pub(crate) struct Facts<'a> {
     pub(crate) category: Category,
     pub(crate) kinds: Kinds,
     pub(crate) type_name: Option<&'a str>,
-    #[cfg_attr(not(feature = "alloc"), allow(dead_code))]
-    pub(crate) public: Option<&'a str>,
 }
 
 /// The facts of `error`: from its probe; a foreign error is `ERROR` with
 /// category `Unknown`, except a `std::io::Error`, the one built-in fallback.
+/// An `io::Error` is never a generated type, so it is checked first and its
+/// `description()`, which can carry outside text, is never decoded.
 pub(crate) fn facts<'a>(error: &'a (dyn Error + 'static)) -> Facts<'a> {
-    if let Some(identity) = identify(error) {
-        return Facts {
-            code: identity.code,
-            severity: identity.severity,
-            category: identity.category,
-            kinds: identity.kinds,
-            type_name: Some(identity.type_name),
-            public: identity.public,
-        };
-    }
     #[cfg(feature = "std")]
     if let Some(io) = error.downcast_ref::<std::io::Error>() {
         use crate::ErrorInfo;
@@ -139,7 +179,15 @@ pub(crate) fn facts<'a>(error: &'a (dyn Error + 'static)) -> Facts<'a> {
             category: io.category(),
             kinds: io.kinds(),
             type_name: Some(io.type_name()),
-            public: None,
+        };
+    }
+    if let Some(identity) = identify(error) {
+        return Facts {
+            code: identity.code,
+            severity: identity.severity,
+            category: identity.category,
+            kinds: identity.kinds,
+            type_name: Some(identity.type_name),
         };
     }
     Facts {
@@ -148,7 +196,6 @@ pub(crate) fn facts<'a>(error: &'a (dyn Error + 'static)) -> Facts<'a> {
         category: Category::Unknown,
         kinds: Kinds::ERROR,
         type_name: None,
-        public: None,
     }
 }
 
@@ -269,9 +316,10 @@ pub(crate) fn stated_severity(error: &(dyn Error + 'static)) -> Option<u8> {
 }
 
 /// Decodes a probe string; `None` unless every field is valid. A foreign
-/// error stops at the magic.
-#[inline]
-pub(crate) fn decode(text: &str) -> Option<Identity<'_>> {
+/// error stops at the magic. The tests' entry; `identify` adds the `Display`
+/// check.
+#[cfg(test)]
+fn decode(text: &str) -> Option<Identity<'_>> {
     if text.as_bytes().first_chunk::<4>() == Some(MAGIC) {
         decode_fields(text)
     } else {
@@ -296,6 +344,7 @@ fn decode_fields(text: &str) -> Option<Identity<'_>> {
         return None;
     }
     // Byte 42 is ASCII, so `HEADER` is a character boundary, as is a `|`.
+    // Flag bit 0 marks an older probe's public message: checked, not kept.
     let rest = text.get(HEADER..)?;
     let (type_name, public) = if flags & 1 != 0 {
         let name_len = rest.bytes().position(|byte| byte == b'|')?;
@@ -317,8 +366,6 @@ fn decode_fields(text: &str) -> Option<Identity<'_>> {
         severity,
         category,
         kinds,
-        has_public: public.is_some(),
-        public,
         transparent: flags & 2 != 0,
         type_name,
     })
@@ -370,15 +417,13 @@ mod tests {
         assert_eq!(id.severity, Severity::ERROR);
         assert_eq!(id.category, Category::DeadlineExceeded);
         assert_eq!(id.kinds, Kinds::ERROR);
-        assert!(id.has_public && !id.transparent);
-        assert_eq!(id.public, Some("Try later."));
+        assert!(!id.transparent);
         assert_eq!(id.type_name, "DbError::Timeout");
 
         let plain =
             decode("\0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound").unwrap();
         assert!(plain.code.is_none());
         assert_eq!(plain.category, Category::Unknown);
-        assert_eq!(plain.public, None);
     }
 
     #[test]
@@ -423,7 +468,7 @@ mod tests {
     fn test_decode_public_length_limit() {
         let mut probe = std::string::String::from("\0DE1xxxxxxxxxxxxxxxx1102000000000000000101|T|");
         probe.push_str(&"p".repeat(512));
-        assert_eq!(decode(&probe).unwrap().public.map(str::len), Some(512));
+        assert_eq!(decode(&probe).unwrap().type_name, "T");
         probe.push('p');
         assert!(decode(&probe).is_none());
     }

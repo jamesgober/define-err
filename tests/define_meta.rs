@@ -242,16 +242,15 @@ fn test_identify_reads_every_generated_variant() {
     assert_eq!(id.severity, Severity::CRITICAL);
     assert_eq!(id.category, Category::DataLoss);
     assert_eq!(id.kinds, Kinds::ERROR | Kinds::SECURITY);
-    assert!(!id.has_public);
-    assert_eq!(id.public, None);
     assert_eq!(id.type_name, "DbError::Corrupt");
 
-    let timeout = identify(&DbError::Timeout { after_ms: 1 }).unwrap();
-    assert!(timeout.has_public);
-    assert_eq!(
-        timeout.public,
-        Some("The database is busy. Try again shortly.")
-    );
+    // The probe carries no public message: through `&dyn Error` it could be
+    // imitated, so `public_message()` on the typed value is the only source.
+    let timeout = DbError::Timeout { after_ms: 1 };
+    #[allow(deprecated)]
+    let probe = std::error::Error::description(&timeout);
+    assert!(!probe.contains("busy"));
+    assert_eq!(identify(&timeout).unwrap().type_name, "DbError::Timeout");
     assert!(identify(&PlanError::Uncoded).unwrap().code.is_none());
     assert!(identify(&std::fmt::Error).is_none());
 }

@@ -104,7 +104,12 @@ fn test_header_comes_from_the_outermost_coded_entry() {
     let record = ErrorRecord::from_error(&err);
     assert_eq!(record.code.unwrap().to_string(), "DB-0001");
     assert_eq!(record.category, Category::DeadlineExceeded);
-    assert_eq!(record.public, "The database is busy. Try again shortly.");
+    // Through `&dyn Error`, the category's sentence, never the variant's own
+    // `#[public]`, which only the typed value vouches for.
+    assert_eq!(
+        record.public,
+        Category::DeadlineExceeded.default_public_message()
+    );
     assert_eq!(record.chain.len(), 2);
     assert_eq!(record.chain[0].message, "storage failed");
     assert_eq!(record.chain[0].code, None);

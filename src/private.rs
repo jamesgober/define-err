@@ -589,7 +589,9 @@ pub const fn catalog<const N: usize>(parts: &[&[crate::CodeInfo]]) -> [crate::Co
 /// Lowercase hex digits.
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
-/// The length of one variant's probe string. Const evaluation only.
+/// The length of one variant's probe string, and the checks of its name and
+/// its public message (which the probe no longer carries, but whose limit
+/// stays). Const evaluation only.
 #[doc(hidden)]
 #[allow(clippy::panic)]
 pub const fn probe_len(name: &str, public: Option<&str>) -> usize {
@@ -603,8 +605,7 @@ pub const fn probe_len(name: &str, public: Option<&str>) -> usize {
         Some(text) if text.len() > crate::probe::MAX_PUBLIC => {
             panic!("define_errors!: a public message is longer than 512 bytes")
         }
-        Some(text) => crate::probe::HEADER + name.len() + 1 + text.len(),
-        None => crate::probe::HEADER + name.len(),
+        _ => crate::probe::HEADER + name.len(),
     }
 }
 
@@ -627,8 +628,9 @@ pub struct ProbeBuf<const N: usize> {
 }
 
 impl<const N: usize> ProbeBuf<N> {
-    /// Builds a probe of `probe_len(name, public)` bytes. Const evaluation
-    /// only. `transparent` is the flag bit; the public bit follows `public`.
+    /// Builds a probe of `probe_len(name, _)` bytes. Const evaluation only.
+    /// `transparent` is flag bit 1; bit 0 (an older probe's public message)
+    /// is never set.
     pub const fn new(
         code: Option<u64>,
         severity: u8,
@@ -636,7 +638,6 @@ impl<const N: usize> ProbeBuf<N> {
         kinds: u64,
         transparent: bool,
         name: &str,
-        public: Option<&str>,
     ) -> ProbeBuf<N> {
         let mut bytes = [0_u8; N];
         let magic = crate::probe::MAGIC;
@@ -661,7 +662,7 @@ impl<const N: usize> ProbeBuf<N> {
             bytes[24 + k] = HEX[((kinds >> (60 - 4 * k)) & 0xf) as usize];
             k += 1;
         }
-        let flags = public.is_some() as u8 | (transparent as u8) << 1;
+        let flags = (transparent as u8) << 1;
         bytes[40] = b'0';
         bytes[41] = HEX[flags as usize];
         bytes[42] = b'|';
@@ -671,16 +672,6 @@ impl<const N: usize> ProbeBuf<N> {
             bytes[crate::probe::HEADER + n] = name[n];
             n += 1;
         }
-        if let Some(text) = public {
-            let text = text.as_bytes();
-            let start = crate::probe::HEADER + name.len() + 1;
-            bytes[start - 1] = b'|';
-            let mut t = 0;
-            while t < text.len() {
-                bytes[start + t] = text[t];
-                t += 1;
-            }
-        }
         ProbeBuf { bytes }
     }
 
@@ -689,7 +680,7 @@ impl<const N: usize> ProbeBuf<N> {
     pub const fn as_str(&self) -> &str {
         match core::str::from_utf8(&self.bytes) {
             Ok(text) => text,
-            Err(_) => panic!("define_errors!: a public message must be UTF-8"),
+            Err(_) => panic!("define_errors!: a probe must be UTF-8"),
         }
     }
 }

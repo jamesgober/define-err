@@ -145,7 +145,7 @@
 //!
 //! ## Status
 //!
-//! `0.9.3`, the beta: feature complete, measured, hardened, checked against
+//! `0.10.0`, the beta: feature complete, measured, hardened, checked against
 //! real migrations, and in its pre-1.0 polish pass. The public API of 1.0 is written in `docs/API.md` and what the macro expands to in
 //! `docs/GENERATED-CODE.md` (both in the
 //! [repository](https://github.com/jamesgober/define-err)).
@@ -218,8 +218,8 @@ pub use crate::{
         creation_hook, deprecated, flush, is_installed, kinds_mask, min_severity, notice,
         notice_with, report, report_with, reporter, reporter_installed_at, set_kinds_mask,
         set_min_severity, set_warn_mode, soft, stats, trigger, warn, warn_mode, warn_with,
-        Annotate, CreationHook, CreationInfo, Event, FacadeStats, InstallError, Reporter, Slot,
-        Verb, WarnMode,
+        would_deliver, Annotate, CreationHook, CreationInfo, Event, FacadeStats, InstallError,
+        Reporter, Slot, Verb, WarnMode,
     },
     info::{catalog, CodeInfo, CodeState, ErrorInfo, UrlDisplay},
     kinds::{Kinds, KindsIter},

@@ -153,7 +153,6 @@ impl ::core::error::Error for PageError {
                 const B: &$crate::__private::ProbeBuf<L> = &$crate::__private::ProbeBuf::new(
                     ::core::option::Option::None, 17, 2, 1, false,
                     ::core::concat!(::core::stringify!(PageError), "::", ::core::stringify!(NotFound)),
-                    P,
                 );
                 const S: &str = B.as_str();
                 S
@@ -349,7 +348,7 @@ impl $crate::ErrorInfo for AppError {
 ```
 
 - A transparent variant is its inner value as far as anyone can tell: `Display`, `source()`, every `ErrorInfo` method, and the probe all come from the inner value when it has them. A wrapper adds no entry to the error chain, so a chain walker that reads probes must see the inner identity here, not the wrapper's.
-- `forward_probe(inner, own)` returns `inner` when it starts with the probe magic, and `own` otherwise. `own` carries flag bit 1 (transparent), so a transparent wrapper around a foreign error is still recognised as generated code.
+- `forward_probe(inner, own)` returns `inner` when it starts with the probe magic, and `own` otherwise. `own` carries flag bit 1 (transparent), so a transparent wrapper around a foreign error is still recognised as generated code. When the inner value is outside text shaped like a probe (std's string errors on Rust 1.81 to 1.89), the wrapper's `Display` is that text too, so `identify` refuses the wrapper: it fails closed and reads as a foreign error, never as the claimed code.
 - `info_of!(inner)` returns `Option<&dyn ErrorInfo>` by the same autoref dispatch as `source_of!`: `Some` when the inner type implements `ErrorInfo`, `None` otherwise. On `None` each method returns the variant's own value: its metadata attributes (`#[category]`, `#[severity]`, and the rest, written on the transparent variant) or the defaults. A transparent wrapper around `std::io::Error` therefore reports the category the `ErrorInfo` impl for `io::Error` derives from its kind, and one around a foreign error reports what the variant says.
 - `description_of!(inner)` reads the inner value's `description()`, through the `Error` impl for a sized type and through `dyn Error` for a boxed trait object.
 - `transparent` needs exactly one field besides an optional `#[location]`; it may be `#[from]`.
@@ -690,20 +689,22 @@ Every method is generated for every type, as a `match` returning constants or co
 | 20 | 2 | severity in lowercase hex (`01` to `18`) |
 | 22 | 2 | category gRPC number in lowercase hex (`01` to `10`) |
 | 24 | 16 | kinds bits in lowercase hex |
-| 40 | 2 | flags in lowercase hex: bit 0 the variant has `#[public]`; bit 1 transparent; other bits zero |
+| 40 | 2 | flags in lowercase hex: bit 1 transparent; other bits zero |
 | 42 | 1 | `\|` |
 | 43 | 1 to 128 | type name, `Type::Variant` or `Type` (ASCII) |
-| then, with flag bit 0 | 1 | `\|` |
-| | 0 to 512 | the `#[public]` message (UTF-8), so `ErrorRecord` and the error service can read it through `&dyn Error` |
+
+Flag bit 0 is retired (`0.10`). Probes from 0.9 and older set it when the variant had `#[public]` and appended `|` and that message; the decoder still accepts such a probe and ignores the text. A probe read through `&dyn Error` proves nothing about who wrote it, and std's own string errors return arbitrary text from `description()` on Rust 1.81 to 1.89, so a public message read that way could be a peer's. Client-safe text comes from `ErrorInfo::public_message()` on the typed value or from a catalog entry.
+
+`identify` also requires that the error's `Display` not begin with the magic. A generated type displays its message, never its probe, so this refuses only outside text shaped like a probe.
 
 Examples, from [`tests/golden/probe.txt`](../tests/golden/probe.txt) (`\0` is the NUL byte):
 
 ```text
-DbError::Timeout     \0DE13b34a2f2600000011104000000000000000101|DbError::Timeout|The database is busy. Try again shortly.
+DbError::Timeout     \0DE13b34a2f2600000011104000000000000000100|DbError::Timeout
 PageError::NotFound  \0DE1xxxxxxxxxxxxxxxx1102000000000000000100|PageError::NotFound
 ```
 
-The probe is built by `__private::ProbeBuf::new` in a `const` item, exactly `__private::probe_len(name, public)` bytes long, and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A plain type's probes have the same bytes, written as `concat!` literals because they differ only in the name, and `__private::check_names` makes the same checks of every name in one `const` item (`0.6`). A type name longer than 128 bytes or a public message longer than 512 is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
+The probe is built by `__private::ProbeBuf::new` in a `const` item, exactly `__private::probe_len(name, public)` bytes long (the name's length plus the header; the public message only has its length checked), and turned into `&'static str` by a `const fn`, so at run time `description()` returns a pointer and a length. A plain type's probes have the same bytes, written as `concat!` literals because they differ only in the name, and `__private::check_names` makes the same checks of every name in one `const` item (`0.6`). A type name longer than 128 bytes or a public message longer than 512 is a compile error. Code that calls the deprecated `description()` on a generated type gets the probe text instead of a sentence; no portfolio crate does.
 
 ## Compile-time checks
 
@@ -761,9 +762,9 @@ Rules the macro itself rejects with `compile_error!` (each names the fix, and ea
 | `INVALID_NUMBER` | `const INVALID_NUMBER: u32 = u32::MAX` | stands in for a `#[code]` with no number literal, whose own error is already reported, in `check_block` and the `match`; a `#[code]` with a literal but another fault keeps its literal | 0.8 |
 | `catalog_len`, `catalog` | `const fn catalog_len(parts: &[&[CodeInfo]]) -> usize`; `const fn catalog<const N: usize>(parts: &[&[CodeInfo]]) -> [CodeInfo; N]` | build a type's `CATALOG` from per-variant parts | 0.4 |
 | `check_docs` | `const fn check_docs(template: &str)` | the docs template has a placeholder | 0.4 |
-| `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong or non-ASCII name or an overlong public message | 0.5 |
+| `probe_len` | `const fn probe_len(name: &str, public: Option<&str>) -> usize` | the exact probe length; panics in const evaluation on an overlong or non-ASCII name or an overlong public message (since `0.10` the length no longer includes the public message) | 0.5 |
 | `check_names` | `const fn check_names(names: &[&str])` | `probe_len`'s checks of a plain type's names | 0.6 |
-| `ProbeBuf` | `struct ProbeBuf<const N: usize>`; `const fn new(code: Option<u64>, severity: u8, category: u8, kinds: u64, transparent: bool, name: &str, public: Option<&str>) -> ProbeBuf<N>`; `const fn as_str(&self) -> &str` | builds the probe string at compile time (`0.4`; const-sized, with the public message, `0.5`) | 0.4 |
+| `ProbeBuf` | `struct ProbeBuf<const N: usize>`; `const fn new(code: Option<u64>, severity: u8, category: u8, kinds: u64, transparent: bool, name: &str) -> ProbeBuf<N>`; `const fn as_str(&self) -> &str` | builds the probe string at compile time (`0.4`; const-sized, with the public message, `0.5`; without it, `0.10`) | 0.4 |
 | `forward_probe` | `fn forward_probe<'a>(inner: &'a str, own: &'static str) -> &'a str` | transparent variants | 0.4 |
 | `platform_kinds` | module of `Kinds` constants `ERROR` to `TRIGGER` | glob-imported where `#[kinds]` is expanded | 0.4 |
 | `named_levels` | module of `Severity` constants `TRACE` to `FATAL` | glob-imported where `#[severity(NAME)]` is expanded | 0.4 |
