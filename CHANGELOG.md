@@ -13,7 +13,7 @@
 
 ---
 
-## [0.10.0] - 2026-11-11
+## [0.10.0] - 2026-11-12
 
 Fixes from an independent review. Outside text can no longer pass for a
 generated error's identity or reach a record's public message, and a build

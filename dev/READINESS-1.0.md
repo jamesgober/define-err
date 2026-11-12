@@ -1,6 +1,6 @@
 # define-err - 1.0 readiness
 
-> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-11, at 0.10.0.
+> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.9; nothing listed here becomes final silently. Last updated 2026-11-12, at 0.10.0.
 
 ## Decisions for James
 
