@@ -719,25 +719,47 @@ mod tests {
     #[cfg(feature = "alloc")]
     #[test]
     fn test_index_agrees_with_the_linear_forms() {
-        use std::{boxed::Box, vec::Vec};
-
-        let make = |numbers: &[u32], name: &'static str| -> &'static [CodeInfo] {
-            let entries: Vec<CodeInfo> = numbers
-                .iter()
-                .map(|&n| CodeInfo::new(code(n), "t", "h").with_type_name(name))
-                .collect();
-            Box::leak(entries.into_boxed_slice())
-        };
-        let a = make(&[9, 3, 700, 41], "A");
-        let b = make(&[1, 8000, 42], "B");
-        let c = make(&[42, 5], "C");
+        /// A catalog entry, in a `static`: `Catalog` takes `'static` parts.
+        const fn entry(n: u32, name: &'static str) -> CodeInfo {
+            let code = match crate::Namespace::try_new("DB") {
+                Ok(ns) => match ns.code(n) {
+                    Some(c) => c,
+                    None => panic!(),
+                },
+                Err(_) => panic!(),
+            };
+            CodeInfo::new(code, "t", "h").with_type_name(name)
+        }
+        static A: [CodeInfo; 4] = [
+            entry(9, "A"),
+            entry(3, "A"),
+            entry(700, "A"),
+            entry(41, "A"),
+        ];
+        static B: [CodeInfo; 3] = [entry(1, "B"), entry(8000, "B"), entry(42, "B")];
+        static C: [CodeInfo; 2] = [entry(42, "C"), entry(5, "C")];
+        let (a, b, c): (
+            &'static [CodeInfo],
+            &'static [CodeInfo],
+            &'static [CodeInfo],
+        ) = (&A, &B, &C);
         let index = catalog::Catalog::new(&[a, b]).unwrap();
         assert_eq!(index.len(), 7);
         assert!(index
             .iter()
             .zip(index.iter().skip(1))
             .all(|(x, y)| x.code < y.code));
-        for n in 0..9000 {
+        // Every number under Miri would take minutes; there, a stride that
+        // still lands on the entries and around them.
+        let numbers: std::vec::Vec<u32> = if cfg!(miri) {
+            [
+                0, 1, 2, 3, 4, 5, 9, 10, 41, 42, 43, 700, 701, 7999, 8000, 8001,
+            ]
+            .into()
+        } else {
+            (0..9000).collect()
+        };
+        for n in numbers {
             let found = index.find(code(n)).map(|e| e.type_name);
             let linear = catalog::find(&[a, b], code(n)).map(|e| e.type_name);
             assert_eq!(found, linear, "{n}");
