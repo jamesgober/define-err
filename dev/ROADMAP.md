@@ -69,7 +69,7 @@ Exit: no open fuzz finding; every threat has a passing attack test.
 
 ## v0.8.0 - Alpha: first migrations (DONE, 2026-11-05)
 Exit: each migrated crate's CI is green on its own repository against the published 0.8.0.
-- [x] Migrate page-db and an internal consumer's two crates; migrate kraken (MSRV 1.80 to 1.81). Draft PRs on each repository; each owner merges (D-074).
+- [x] Migrate page-db and an internal consumer's two crates; migrate a downstream compiler (MSRV 1.80 to 1.81). Draft PRs on each repository; each owner merges (D-074).
 - [x] Remove the unused `thiserror` dependency from cli-forge: already gone upstream (D-071).
 - [x] Feedback from each migration recorded; fixes land here (D-067 to D-073).
 

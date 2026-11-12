@@ -28,7 +28,7 @@
 | 11. CI green, every platform and mode | Done for every release so far. |
 | 12. Documents complete, no banned words | Re-checked in the 0.9 audit. |
 | 13. L2 passes the shared conformance suite; L3 reads codes through the probe | Open: waits on L2 and L3 (ROADMAP 0.9). |
-| 14. Migrated crates green on the release candidate | page-db, the internal consumer's two crates, kraken, noml-rust, and mod-cli have draft PRs; config-lib waits on J-1. |
+| 14. Migrated crates green on the release candidate | page-db, the internal consumer's two crates, the downstream compiler, noml-rust, and mod-cli have draft PRs; config-lib waits on J-1. |
 | 15. Release routine for 1.0.0 | After J-3. |
 
 ## Open items from the 0.x series
@@ -47,5 +47,5 @@
 | A crate past 1.0 takes define-err as a public dependency | D-070, D-092 | Policy recorded; the semver trick is carried out at 1.0, so a 1.x and a 2.x share one facade. Until then `links` refuses a second copy from 0.10 on. |
 | `identify` on a generated type, 38 ns with the `Display` check (26 before) | D-091 | Kept: the check is what refuses outside text shaped like a probe on Rust 1.81 to 1.89; it stays off the filtered `report` path. |
 | A forged low severity in outside text can drop its own event | D-063, D-091 | Kept: severity filtering is not a security boundary, and the check would cost every filtered `report` 16 ns. The event claims nothing when it is delivered. |
-| kraken's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
+| The downstream compiler's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
 | Source size: 5,706 lines of code against a 5,000 target | NFR-14, D-080, D-087, D-088, D-091 to D-096 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
