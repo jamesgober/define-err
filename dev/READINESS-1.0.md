@@ -15,7 +15,7 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 | L-5 | L2 (the attribute front end) builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite. | the L2 owner | open: L2 is not started; `__private` changed in 0.10 (`ProbeBuf::new`) and is in `GENERATED-CODE.md` |
 | L-6 | L3 reads codes through the probe on the 0.10 line: report-err 0.9.0 depends on `^0.10`. | the L3 owner | done for the dependency; its migration away from `Identity::public` is report-err's |
 | L-7 | Two weeks of use with no API change. The last change was 0.10.0 on 2026-11-12, so the earliest date is 2026-11-26. | elapsed time | open |
-| L-8 | The design of the 1.0 facade sharing (D-092): which version holds the statics, how later majors forward to it, and that only it keeps `links`. Written into `docs/STABILITY-1.0.md` before 1.0, because it binds 2.0. | this crate's owner | open |
+| L-8 | The design of the 1.0 facade sharing (D-092): which version holds the statics, how later majors forward to it, and that only it keeps `links`. Written into `docs/STABILITY-1.0.md` before 1.0, because it binds 2.0. | this crate's owner | done: `docs/STABILITY-1.0.md`, "One facade across majors" (D-097) |
 | L-9 | J-1 to J-4 below. | James | open |
 | L-10 | The full audit recorded in `docs/STABILITY-1.0.md`, then the release routine for 1.0.0. | this crate's owner, after J-3 | open |
 
