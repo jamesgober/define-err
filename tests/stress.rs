@@ -1,5 +1,7 @@
 //! Stress and soak (`dev/PLAN.md` 12.5): every verb from 64 threads against a
-//! counting reporter, with exact counts and flat memory. A short pass runs in
+//! counting reporter, with exact counts and flat memory, while one more thread
+//! keeps changing the kinds mask between two masks that both pass every event
+//! (D-093). A short pass runs in
 //! the suite. The full runs are ignored; they run in release:
 //!
 //! ```text
@@ -13,7 +15,7 @@
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::Relaxed},
         Mutex, MutexGuard,
     },
     thread,
@@ -23,6 +25,9 @@ use std::{
 use define_err::{define_errors, ErrorRecord, Event, Kinds, Reporter, Severity, Verb};
 
 const THREADS: u64 = 64;
+
+/// Every kind but the last project bit, which no event in the mix carries.
+const NEARLY_ALL: Kinds = Kinds::from_bits(u64::MAX >> 1);
 
 /// Memory may rise this far past the first round: allocator and thread-exit
 /// bookkeeping, not anything that scales with events.
@@ -155,14 +160,32 @@ fn drive(rounds: u64, calls: u64, until: Option<Instant>) -> (u64, usize) {
     let mut done = 0;
     let expired = || until.is_some_and(|end| Instant::now() >= end);
     while done < rounds && !expired() {
+        let stop = AtomicBool::new(false);
         thread::scope(|scope| {
-            for thread in 0..THREADS {
-                let _ = scope.spawn(move || {
-                    for call in 0..calls {
-                        mix(thread << 32 | call);
-                    }
-                });
+            let stop = &stop;
+            let _ = scope.spawn(move || {
+                let mut whole = false;
+                while !stop.load(Relaxed) {
+                    let mask = if whole { Kinds::ALL } else { NEARLY_ALL };
+                    define_err::set_kinds_mask(mask);
+                    whole = !whole;
+                    thread::yield_now();
+                }
+                define_err::set_kinds_mask(Kinds::ALL);
+            });
+            let workers: Vec<_> = (0..THREADS)
+                .map(|thread| {
+                    scope.spawn(move || {
+                        for call in 0..calls {
+                            mix(thread << 32 | call);
+                        }
+                    })
+                })
+                .collect();
+            for worker in workers {
+                let _ = worker.join();
             }
+            stop.store(true, Relaxed);
         });
         done += 1;
         let live = LIVE.load(Relaxed);
