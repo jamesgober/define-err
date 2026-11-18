@@ -1,6 +1,6 @@
 # define-err 1.0 stability
 
-> **Draft, written at 0.9.1.** Nothing here is a promise yet. It becomes one at 1.0.0, when the audit record at the end is filled in and the release is approved. Until then, `0.9.x` releases may still change anything below, and each change is listed in the changelog.
+> **Draft, written at 0.9.1.** Nothing here is a promise yet. It becomes one at 1.0.0, when the audit record at the end is filled in and the release is approved. Until then, `0.x` releases may still change anything below, and each change is listed in the changelog.
 
 What a crate that depends on `define-err = "1"` can rely on until 2.0, how each promise is checked, and what is left out on purpose.
 
@@ -23,6 +23,18 @@ What a crate that depends on `define-err = "1"` can rely on until 2.0, how each 
 | No run-time panic | No function panics at run time; checks on literal input fail at compile time. | `tests/attack*.rs`, fuzz targets, review |
 
 The same bytes, codes, probes, and tables on every platform is NFR-10 of [`dev/PLAN.md`](../dev/PLAN.md).
+
+## One facade across majors
+
+A program has one reporter, one creation hook, one set of filters, and one table of warned sites, however many crates in it depend on define-err and on whichever major version. 1.x holds that state, and a later major depends on 1.x and forwards to it.
+
+- **1.x owns the facade.** Its manifest keeps `links = "define_err_facade"` in every 1.x release, so a build can hold one 1.x copy and Cargo refuses a second.
+- **2.0 does not set `links`.** It depends on `define-err` 1.x under another name and keeps no facade state of its own. Its verbs build a 1.x `Event` and pass it to the 1.x facade, and the reporter or hook it installs is wrapped so that it receives the 1.x events converted to 2.0's types. A reporter installed through either version sees every event from both.
+- **Conversion, not shared types.** 2.0 may change `Event`, `ErrorRecord`, `Severity`, `Kinds`, or `Code`: it converts at the boundary. What a 1.x reporter cannot represent, such as a new field, it does not see.
+- **Locations survive the hop.** Every 1.x verb and setter that reads its caller's location is `#[track_caller]` and stays so in 1.x, so a 2.0 verb that is `#[track_caller]` and calls it reports its own caller, and the once-per-site memory keys on the right line.
+- **Everything a forwarder needs is public in 1.0.** An `Event` and an `ErrorRecord` can be built and read field by field through the API in [`API.md`](./API.md): `Event::new` and its `with_` methods, its getters, `ErrorRecord::new`, and the record's public fields. No 1.x change may make one of them crate-private.
+
+Checked at 1.0 by `tests/two_copies.sh` (one copy builds, two do not) and `cargo semver-checks` (the forwarder's API stays). The 2.0 release adds a CI build with one 1.x user and one 2.0 user, and checks that one reporter receives events from both.
 
 ## Minimum Rust version
 

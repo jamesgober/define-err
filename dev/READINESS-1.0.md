@@ -8,14 +8,14 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 
 | # | Step | Who | State |
 |---|---|---|---|
-| L-1 | Move the two migration branches to 0.10: noml-rust (draft PR 40) and mod-cli (draft PR 1) pin `"0.9"`, and report-err 0.9.0 depends on `^0.10`, so a build with both would hold two facades that Cargo cannot refuse (0.9 does not set `links`). Both use only `define_errors!`; the change is the version line. | this crate's owner | open |
-| L-2 | Re-run the 24-hour fuzz of the targets whose code changed in 0.10: `probe_decode` (the `Display` check, the retired public text) and `record_from_chain` (bidirectional controls). | this crate's owner | open; the other five targets are unchanged since D-066 |
-| L-3 | Re-run the 8-hour soak of every verb from 64 threads: the kinds mask changed in 0.10 (D-093). loom models the new mask; the soak checks it at scale. | this crate's owner | open |
+| L-1 | Move the two migration branches to 0.10: noml-rust (draft PR 40) and mod-cli (draft PR 1) pin `"0.9"`, and report-err 0.9.0 depends on `^0.10`, so a build with both would hold two facades that Cargo cannot refuse (0.9 does not set `links`). Both use only `define_errors!`; the change is the version line. | this crate's owner | noml-rust done: on 0.10 and merged (noml-lang/noml-rust#40); mod-cli is on 0.10 with green CI and stays a draft until its error enum is settled |
+| L-2 | Re-run the 24-hour fuzz of the targets whose code changed in 0.10: `probe_decode` (the `Display` check, the retired public text) and `record_from_chain` (bidirectional controls). | this crate's owner | running since 2026-11-18 14:49 UTC, both targets at once, `nice 15`; the other five targets are unchanged since D-066 |
+| L-3 | Re-run the 8-hour soak of every verb from 64 threads: the kinds mask changed in 0.10 (D-093). loom models the new mask; the soak checks it at scale. | this crate's owner | running since 2026-11-18 14:49 UTC; the soak now changes the kinds mask while it runs (`tests/stress.rs`, PR 18) |
 | L-4 | The performance pass on a quiet machine (ROADMAP 0.9 polish): every figure since 0.6 was taken at a load average of 47 to 130. | this crate's owner | open; needs a quiet machine, not more code |
 | L-5 | L2 (the attribute front end) builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite. | the L2 owner | open: L2 is not started; `__private` changed in 0.10 (`ProbeBuf::new`) and is in `GENERATED-CODE.md` |
 | L-6 | L3 reads codes through the probe on the 0.10 line: report-err 0.9.0 depends on `^0.10`. | the L3 owner | done for the dependency; its migration away from `Identity::public` is report-err's |
 | L-7 | Two weeks of use with no API change. The last change was 0.10.0 on 2026-11-12, so the earliest date is 2026-11-26. | elapsed time | open |
-| L-8 | The design of the 1.0 facade sharing (D-092): which version holds the statics, how later majors forward to it, and that only it keeps `links`. Written into `docs/STABILITY-1.0.md` before 1.0, because it binds 2.0. | this crate's owner | open |
+| L-8 | The design of the 1.0 facade sharing (D-092): which version holds the statics, how later majors forward to it, and that only it keeps `links`. Written into `docs/STABILITY-1.0.md` before 1.0, because it binds 2.0. | this crate's owner | done: `docs/STABILITY-1.0.md`, "One facade across majors" (D-097) |
 | L-9 | J-1 to J-4 below. | James | open |
 | L-10 | The full audit recorded in `docs/STABILITY-1.0.md`, then the release routine for 1.0.0. | this crate's owner, after J-3 | open |
 
