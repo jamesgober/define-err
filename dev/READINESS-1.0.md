@@ -8,7 +8,7 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 
 | # | Step | Who | State |
 |---|---|---|---|
-| L-1 | Move the two migration branches to 0.10: noml-rust (draft PR 40) and mod-cli (draft PR 1) pin `"0.9"`, and report-err 0.9.0 depends on `^0.10`, so a build with both would hold two facades that Cargo cannot refuse (0.9 does not set `links`). Both use only `define_errors!`; the change is the version line. | this crate's owner | noml-rust done: on 0.10 and merged (noml-lang/noml-rust#40); mod-cli is on 0.10 with green CI and stays a draft until its error enum is settled |
+| L-1 | Move the migration branch of noml-rust (PR 40) to 0.10: it pinned `"0.9"`, and report-err 0.9.0 depends on `^0.10`, so a build with both would hold two facades that Cargo cannot refuse (0.9 does not set `links`). mod-cli is left out: it is being replaced, and its migration PR is closed. | this crate's owner | done: noml-rust is on 0.10 and merged (noml-lang/noml-rust#40) |
 | L-2 | Re-run the 24-hour fuzz of the targets whose code changed in 0.10: `probe_decode` (the `Display` check, the retired public text) and `record_from_chain` (bidirectional controls). | this crate's owner | running since 2026-11-18 22:31 UTC, both targets at once, `nice 15`; the other five targets are unchanged since D-066 |
 | L-3 | Re-run the 8-hour soak of every verb from 64 threads: the kinds mask changed in 0.10 (D-093). loom models the new mask; the soak checks it at scale. | this crate's owner | done 2026-11-18: 8 hours, 22,449 rounds of 100,000 calls on each of 64 threads with the mask changing throughout, exact counts, highest live memory 20,795 bytes; the ten-million run took 128 s |
 | L-4 | The performance pass on a quiet machine (ROADMAP 0.9 polish): every figure since 0.6 was taken at a load average of 47 to 130. | this crate's owner | open; needs a quiet machine, not more code |
@@ -45,7 +45,7 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 | 11. CI green, every platform and mode | Done for every release so far. |
 | 12. Documents complete, no banned words | Re-checked in the 0.9 audit. |
 | 13. L2 passes the shared conformance suite; L3 reads codes through the probe | L3 is on 0.10 (L-6); L2 is open (L-5). |
-| 14. Migrated crates green on the release candidate | page-db, the internal consumer's two crates, the downstream compiler, noml-rust, and mod-cli have draft PRs, which move to the release candidate's version before 1.0 (noml-rust and mod-cli first, L-1); config-lib waits on J-1. |
+| 14. Migrated crates green on the release candidate | page-db, the internal consumer's two crates, the downstream compiler, and noml-rust have migration PRs (noml-rust merged on 0.10, L-1); the drafts move to the release candidate's version before 1.0. mod-cli is being replaced and is not migrated. config-lib waits on J-1. |
 | 15. Release routine for 1.0.0 | After J-3. |
 
 ## Open items from the 0.x series
