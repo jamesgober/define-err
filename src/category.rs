@@ -159,6 +159,11 @@ impl Category {
     /// The process exit code, from `sysexits(3)`; `Cancelled` is 130 (the
     /// shell's 128 + SIGINT).
     ///
+    /// The code follows the category alone. Only `DataLoss` exits 74
+    /// (`EX_IOERR`): a failed read or write that lost nothing has the category
+    /// of its cause (`from_io_kind`), and a program that wants 74 for it sets
+    /// the exit code itself.
+    ///
     /// # Examples
     ///
     /// ```

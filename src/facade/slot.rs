@@ -19,8 +19,7 @@ type Location = &'static core::panic::Location<'static>;
 
 /// A reference set at most once, with where it was set.
 pub(crate) struct WriteOnce<T: ?Sized + 'static> {
-    value: Cell<Option<&'static T>>,
-    at: Cell<Option<Location>>,
+    cell: Cell<Option<(&'static T, Location)>>,
 }
 
 // SAFETY: `install` writes only as the single claimant, before the `Release`
@@ -33,7 +32,7 @@ impl<T: ?Sized + 'static> WriteOnce<T> {
     maybe_const! {
         /// An empty slot.
         pub(crate) fn new() -> WriteOnce<T> {
-            WriteOnce { value: Cell::new(None), at: Cell::new(None) }
+            WriteOnce { cell: Cell::new(None) }
         }
     }
 
@@ -52,35 +51,35 @@ impl<T: ?Sized + 'static> WriteOnce<T> {
             Claim::Busy => return Err(None),
             Claim::Taken => return Err(self.installed_at(control.load(), state)),
         }
-        let value = make();
+        let entry = Some((make(), at));
         // SAFETY: the claim makes this the only writer, and no reader looks
         // before the publish below.
-        self.value.with_mut(|slot| unsafe { *slot = Some(value) });
-        // SAFETY: as above.
-        self.at.with_mut(|slot| unsafe { *slot = Some(at) });
+        self.cell.with_mut(|slot| unsafe { *slot = entry });
         control.publish(state);
         Ok(())
+    }
+
+    /// The value and where it was installed, when `word` says the slot is
+    /// ready.
+    #[inline]
+    fn read(&self, word: Word, state: u32) -> Option<(&'static T, Location)> {
+        if word.is_ready(state) {
+            // SAFETY: a ready `Word` came from an `Acquire` load that saw the
+            // publish, and nothing writes after it.
+            self.cell.with(|slot| unsafe { *slot })
+        } else {
+            None
+        }
     }
 
     /// The installed value, when `word` says the slot is ready.
     #[inline]
     pub(crate) fn get(&self, word: Word, state: u32) -> Option<&'static T> {
-        if word.is_ready(state) {
-            // SAFETY: a ready `Word` came from an `Acquire` load that saw the
-            // publish, and nothing writes after it.
-            self.value.with(|slot| unsafe { *slot })
-        } else {
-            None
-        }
+        self.read(word, state).map(|(value, _)| value)
     }
 
     /// Where the value was installed, when `word` says the slot is ready.
     pub(crate) fn installed_at(&self, word: Word, state: u32) -> Option<Location> {
-        if word.is_ready(state) {
-            // SAFETY: as in `get`.
-            self.at.with(|slot| unsafe { *slot })
-        } else {
-            None
-        }
+        self.read(word, state).map(|(_, at)| at)
     }
 }

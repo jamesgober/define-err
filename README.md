@@ -43,15 +43,15 @@
 
 ```toml
 [dependencies]
-define-err = "0.10.0"
+define-err = "0.10.1"
 ```
 
 Without the standard library:
 
 ```toml
 [dependencies]
-define-err = { version = "0.10.0", default-features = false }            # core only
-define-err = { version = "0.10.0", default-features = false, features = ["alloc"] }
+define-err = { version = "0.10.1", default-features = false }            # core only
+define-err = { version = "0.10.1", default-features = false, features = ["alloc"] }
 ```
 
 ## Quick start

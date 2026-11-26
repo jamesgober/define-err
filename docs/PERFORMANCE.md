@@ -1,13 +1,13 @@
 # define-err performance
 
-Every target in `dev/PLAN.md` 11.1, what was measured, and how. Measured on 2026-11-02 against version `0.6.0`; the paths 0.7 changed were measured again on 2026-11-03, see [What 0.7 changed](#what-07-changed). A number here is a measurement on the machine below, not a promise for yours.
+Every target in `dev/PLAN.md` 11.1, what was measured, and how. The results table was measured again on 2026-11-25 against version `0.10.0`, on a quiet machine; earlier figures in the sections below were taken under load and say so. A number here is a measurement on the machine below, not a promise for yours.
 
 ## Summary
 
 - **A generated error costs what a hand-written one costs.** The same type written three ways compiles to one function, and `Display` is within noise of both.
-- **A crate with error types builds faster.** A clean build of 20 enums takes 77% less time than with thiserror, because there is no `syn`, `quote`, or `proc-macro2` to compile.
+- **A crate with error types builds faster.** A clean build of 20 enums takes 66% less time than with thiserror, because there is no `syn`, `quote`, or `proc-macro2` to compile.
 - **With no reporter installed, every verb is one load and a branch**, the same as `log` with its level `Off`.
-- **Rebuilding one crate is slower on Linux, by about 0.2 s**, and an enum of 500 variants takes almost twice as long to compile as with thiserror. A declarative macro expands to more text than a derive. See [Missed targets](#missed-targets).
+- **Rebuilding one crate is slower on Linux, by about 0.03 s**, and an enum of 500 variants by 0.12 s (+64%). A declarative macro expands to more text than a derive. See [Missed targets](#missed-targets).
 
 ## Method
 
@@ -16,16 +16,16 @@ Every target in `dev/PLAN.md` 11.1, what was measured, and how. Measured on 2026
 | CPU | AMD Ryzen 9 9950X3D, 16 cores, 32 threads |
 | OS | Ubuntu under WSL2, kernel 6.6.87; build times also on Windows 11 |
 | Toolchain | rustc 1.99.0 |
-| Competitors | thiserror 2.0.21, log 0.4.35, error-forge 1.0.2, criterion 0.5.1 |
+| Competitors | thiserror 2.0.21, log 0.4.35, error-forge 1.2.0, criterion 0.5.1 |
 | Frequency policy | not controlled: WSL2 cannot set it |
-| Load | **a load average of 47 on 32 threads throughout** |
+| Load | a load average of 2 to 4 on 32 threads for the results table (2026-11-25); 47 to 130 for the figures from 0.6 to 0.10 below |
 
-**The machine was not quiet.** Other builds ran during every measurement, and criterion means moved by up to 40% between identical runs. So each hot path has two numbers:
+**Until 0.10 the machine was not quiet.** Other builds ran during every measurement, and criterion means moved by up to 40% between identical runs. The 2026-11-25 run had the machine nearly to itself, and its floors are 5% to 50% lower than the loaded ones for the same code. Each hot path has two numbers:
 
 - **Floor:** from `benches/floor.rs`, the fastest of 4,000 batches of 1,000 calls. It is what the code costs when nothing competes for the core, and it repeats. This is what `tools/bench-compare.py` compares with `benches/baseline.txt`, and a path over 5% fails. The baseline belongs to this machine; on another, regenerate it first.
 - **Mean:** from criterion, 100 samples, default settings. It carries the load, so read it as an upper bound, and read comparisons within one group, which ran together.
 
-Floors include about 0.25 ns of loop overhead (`empty_loop`), so sub-nanosecond figures are close to the limit of the method.
+Floors include about 0.2 ns of loop overhead (`empty_loop`), so sub-nanosecond figures are close to the limit of the method.
 
 **Build settings.** Benchmarks use `[profile.bench]`: LTO off, 16 codegen units, as an application builds. A library's release profile never reaches its users, and with this crate's fat LTO the hash in `warn()` folded away at compile time and the benchmark read 1.4 ns against a true 9.5 ns.
 
@@ -51,27 +51,27 @@ python tools/build-time/compare.py --runs 10
 
 | Operation | Target | Floor | Mean | Compared with | Result |
 |---|---|---|---|---|---|
-| construct and return a generated error | identical to hand-written | | 1.0 ns | thiserror 1.2 ns, hand-written 1.2 ns | **met**: same instructions, see [Assembly](#assembly) |
-| `Display` of a generated variant | within 2% of thiserror | | 120.3 ns | thiserror 120.4 ns, hand-written 120.9 ns | **met** |
+| construct and return a generated error | identical to hand-written | | 0.32 ns | thiserror 0.35 ns, hand-written 0.32 ns | **met**: same instructions, see [Assembly](#assembly) |
+| `Display` of a generated variant | within 2% of thiserror | | 25.0 ns | thiserror 24.5 ns, hand-written 24.4 ns | **met**: the three compile to one function, and the difference is within run-to-run spread |
 | `size_of` of a generated type | equal to hand-written | | | | **met**: asserted in `tests/traits.rs` |
-| `code()` and other `ErrorInfo` methods | under 1 ns | 0.24 ns | 0.5 to 0.7 ns | error-forge 0.4 to 0.6 ns | **met** |
-| `Code` `Display` | under 20 ns, no allocation | 24 ns | 39 ns (0.8) | error-forge `format!` 81 ns, allocates | **missed**; no allocation met |
-| `Code::parse` | under 15 ns, 20% faster than a `String` lookup | 8.7 ns | 12 ns | error-forge registry 75 ns | **met** |
-| catalog lookup by code | constant | | `code_info` 0.6 ns; `catalog::find` 2.4 ns for two codes, linear; `Catalog::find` O(log n), est. under 50 ns at 10,000 codes | error-forge registry 75 ns | **met** by `code_info` and `Catalog` (0.10); `catalog::find` is a scan |
-| verb with nothing installed | one load, under 1 ns | 0.27 to 0.51 ns | 0.35 to 0.68 ns | | **met** |
-| the same, 20% faster than `log::warn!` at `Off` | 20% faster | 0.33 ns for `log` | 0.34 ns for `log` | `log` 0.4 | **missed**: parity |
-| `warn!` after its first delivery | under 2 ns | 0.50 ns | 0.65 ns | | **met** |
-| `warn()` after first delivery | under 5 ns | 7.0 ns | 16 ns | | **missed** |
-| `report` filtered by severity | under 3 ns | 5.7 ns | 6.2 ns | `log::warn!` filtered 0.34 ns | **missed** |
-| `report_with` filtered | | 0.64 ns | 0.91 ns | | |
-| `report` to a no-op reporter | under 10 ns plus the call | 31 ns (0.9) | 49 ns (0.9) | `log::error!` 2.9 ns | **missed**; 0.10 adds the `identify` `Display` check, about 16 ns at the floor |
-| `report` of a foreign error, delivered | | 10.7 ns | 15 ns | | |
-| `notice` to a no-op reporter | | 5.1 ns | 7.8 ns | `log::error!` 2.9 ns | |
-| `identify`, generated type | under 10 ns | 38 ns (0.10; 26 ns in 0.9) | 48 ns (0.10, under load) | | **missed**: 0.10 adds the `Display` check (D-091) |
-| `identify`, foreign type | under 2 ns | 1.8 ns | 2.1 ns | | **met** |
-| `ErrorRecord::from_error`, three levels | under 1 us, allocations published | | 645 ns; one level 394 ns; clone 210 ns | none | **met**: 7 allocations for three foreign levels, 4 for one generated level, pinned in `tests/alloc_free.rs` |
-| `warn!`, 16 threads, one site | | | 1.6 ns | | |
-| clean build, 20 enums | 20% faster than thiserror | | see [Build times](#build-times) | thiserror 2 | **met**: 77% faster |
+| `code()` and other `ErrorInfo` methods | under 1 ns | 0.20 ns | 0.24 to 0.43 ns | error-forge 0.19 to 0.29 ns | **met** |
+| `Code` `Display` | under 20 ns, no allocation | 14.3 ns | 15.3 ns | error-forge `format!` 34 ns, allocates | **met** (24 ns under load before) |
+| `Code::parse` | under 15 ns, 20% faster than a `String` lookup | 4.6 ns | 7.6 ns | error-forge registry 37 ns | **met** |
+| catalog lookup by code | constant | | `code_info` 0.27 ns; `Catalog::find` 1.1 ns, O(log n); `catalog::find` linear | error-forge registry 37 ns | **met** by `code_info` and `Catalog`; `catalog::find` is a scan |
+| verb with nothing installed | one load, under 1 ns | 0.21 to 0.38 ns | 0.19 to 0.25 ns | | **met** |
+| the same, 20% faster than `log::warn!` at `Off` | 20% faster | 0.21 ns for `log` | 0.21 ns for `log` | `log` 0.4 | **missed**: parity |
+| `warn!` after its first delivery | under 2 ns | 0.27 ns | 0.27 ns | | **met** |
+| `warn()` after first delivery | under 5 ns | 4.75 ns | 10.4 ns | | **met** at the floor (7.0 ns under load before); the mean is twice it |
+| `report` filtered by severity | under 3 ns | 3.16 ns | 3.47 ns | `log::warn!` filtered 0.20 ns | **missed** by 5% (5.7 ns under load before) |
+| `report_with` filtered | | 0.49 ns | 0.39 ns | | |
+| `report` to a no-op reporter | under 10 ns plus the call | 25.6 ns | 28.4 ns | `log::error!` 1.7 ns | **missed**: includes `identify` and its `Display` check (D-091) |
+| `report` of a foreign error, delivered | | 7.0 ns | 5.9 ns | | |
+| `notice` to a no-op reporter | | 2.8 ns | 2.7 ns | `log::error!` 1.7 ns | |
+| `identify`, generated type | under 10 ns | 19.9 ns | 22.6 ns | | **missed**: validation plus the `Display` check (D-091) |
+| `identify`, foreign type | under 2 ns | 0.93 ns | 0.98 ns | | **met** |
+| `ErrorRecord::from_error`, three levels | under 1 us, allocations published | | 231 ns; one level 128 ns; clone 65 ns | none | **met**: 7 allocations for three foreign levels, 4 for one generated level, pinned in `tests/alloc_free.rs` |
+| `warn!`, 16 threads, one site | | | 0.36 ns | | |
+| clean build, 20 enums | 20% faster than thiserror | | see [Build times](#build-times) | thiserror 2 | **met**: 66% faster |
 | rebuild after editing one message | no slower than thiserror | | see [Build times](#build-times) | thiserror 2 | **missed on Linux**, met on Windows |
 | expansion of a 500-variant enum | under 1 s of macro expansion | | 0.82 s under load, before the plain arm | thiserror 2 | **met** |
 
@@ -170,13 +170,19 @@ What is left for a type with metadata is spread over every variant: the probe co
 
 `tools/build-time/compare.py`, median of 10 runs: 20 enums of 8 variants, and one enum of 500. The two crates declare the same errors. The script refuses a build that compiled nothing, because a fresh cargo fingerprint looks like a very fast rebuild.
 
-| Linux, seconds | define-err | thiserror | Change |
+| Linux, seconds, 2026-11-25, quiet | define-err | thiserror | Change |
+|---|---|---|---|
+| clean build, dependencies included | 0.58 | 1.70 | **-66%** |
+| rebuild after editing one message | 0.107 | 0.078 | +36% |
+| rebuild of the 500-variant crate | 0.32 | 0.19 | +64% |
+
+| Linux, seconds, 0.6, load average 47 | define-err | thiserror | Change |
 |---|---|---|---|
 | clean build, dependencies included | 1.21 | 5.30 | **-77%** |
 | rebuild after editing one message | 0.46 | 0.26 | +76% |
 | rebuild of the 500-variant crate | 1.33 | 0.73 | +83% |
 
-| Windows, seconds | define-err | thiserror | Change |
+| Windows, seconds, 0.6, under load | define-err | thiserror | Change |
 |---|---|---|---|
 | clean build, dependencies included | 2.24 | 9.32 | **-76%** |
 | rebuild after editing one message | 0.88 | 0.97 | -9% |
@@ -215,16 +221,14 @@ ret
 
 ## Missed targets
 
-Each has a reviewed reason (D-060 in `dev/PLAN.md`) and goes back on the list in the pre-1.0 polish pass, which also re-measures on a quiet machine. The estimates in the plan were written before any of this code existed.
+Each has a reviewed reason (D-060 in `dev/PLAN.md`), looked at again in the pre-1.0 polish pass with the quiet run of 2026-11-25 (D-101). `Code` `Display` and `warn()` were missed under load and are met on the quiet machine, so they are no longer listed. The estimates in the plan were written before any of this code existed.
 
 | Target | Result | Why it stands |
 |---|---|---|
 | verb 20% faster than `log` at `Off` | parity | Both are one load and a branch. There is nothing left to remove. |
-| `Code` `Display` under 20 ns | 24 ns | `write!` of a seven-byte `&str` alone costs 10.5 ns on this machine, and `str::from_utf8` of the text 4.5 ns more. Without that check it reads 20 ns, and `unsafe` stays in one module. Under half the cost of the `format!` it replaces, with no allocation. |
-| `warn()` under 5 ns | 7.0 ns | A function has no per-site static, so the site is found by hashing its file, line, and column. The key is by content because the compiler may emit one location twice. `warn!` is exact and costs 0.5 ns, and is the one to use in a hot loop. |
-| `report` filtered under 3 ns | 5.7 ns | A call, the panic guard, and a virtual call come before the two digits it reads. `report_with` knows its severity and costs 0.64 ns. |
-| `identify` generated under 10 ns | 26 ns | The probe is text from a `&dyn Error` that may be hostile, so every field is validated: 38 hex digits, the code's layout, severity and category ranges, every byte of the name. |
-| `report` to a no-op under 10 ns | 31 ns | The same validation, once per event. Decoding lazily would look better here and only move the cost to any reporter that reads the code. |
-| rebuild no slower than thiserror | 0.2 s slower on Linux | A macro expansion re-runs on every build, and a declarative macro produces more text than a derive. The plain arm halved it for enums without metadata (D-059). |
+| `report` filtered under 3 ns | 3.16 ns | A call, the panic guard, and a virtual call come before the two digits it reads. `report_with` knows its severity and costs 0.64 ns. |
+| `identify` generated under 10 ns | 19.9 ns | The probe is text from a `&dyn Error` that may be hostile, so every field is validated: 38 hex digits, the code's layout, severity and category ranges, every byte of the name. Since 0.10 the error's `Display` is also asked for its first four bytes, which refuses outside text shaped like a probe on Rust 1.81 to 1.89. |
+| `report` to a no-op under 10 ns | 25.6 ns | The same validation, once per event. Decoding lazily would look better here and only move the cost to any reporter that reads the code. |
+| rebuild no slower than thiserror | 0.03 s slower on Linux (+36%) | A macro expansion re-runs on every build, and a declarative macro produces more text than a derive. The plain arm halved it for enums without metadata (D-059). |
 
-The 500-variant enum meets its target of under 1 s of expansion, but is still almost twice thiserror's total. Both this and the rebuild come from work per variant, which is the first item in the polish pass. 0.8's path display adds to it, by the figures in [What 0.8 changed](#what-08-changed).
+The 500-variant enum meets its target of under 1 s of expansion, and rebuilds 0.12 s slower than with thiserror (+64%). Both this and the rebuild come from work per variant. On the quiet machine the differences are 0.03 s and 0.12 s, so the per-variant rework for types with metadata, tried once in D-077 and slower, is not taken up again before 1.0 (D-101): it would change generated code for a gain below what a developer notices.
