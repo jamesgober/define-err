@@ -13,6 +13,28 @@
 
 ---
 
+## [0.10.1] - 2026-11-25
+
+The polish pass, continued: the performance figures measured again on a
+quiet machine, and a smaller unsafe module. The API and the generated code
+are unchanged.
+
+### Changed
+
+- The write-once slot behind `set_reporter` and `set_creation_hook` keeps the
+  value and the place it was installed in one cell, so the crate's only
+  unsafe module has three unsafe sites instead of five. A loser of the
+  install race now always reads a location from the same write as the value.
+- `docs/PERFORMANCE.md` has new figures from a quiet machine. Every hot path
+  is 5% to 50% faster than the figures taken under load showed, `Code`
+  `Display` (14.3 ns) and `warn()` after its first delivery (4.75 ns) meet
+  their targets, and a clean build of 20 enums is 66% faster than with
+  thiserror. `benches/baseline.txt` is regenerated from this run.
+- `Category::exit_code` says that only `DataLoss` exits 74, and that a program
+  wanting 74 for a failed read or write sets the exit code itself.
+
+---
+
 ## [0.10.0] - 2026-11-12
 
 Fixes from an independent review. Outside text can no longer pass for a
@@ -570,7 +592,8 @@ The scaffold and the plan. No functional code yet; this release claims the name.
   decision log D-001 to D-007), `dev/DIRECTIVES.md`, and `dev/ROADMAP.md`.
 - `docs/API.md` with what 0.1.0 exposes.
 
-[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/jamesgober/define-err/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/jamesgober/define-err/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/jamesgober/define-err/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/jamesgober/define-err/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/jamesgober/define-err/compare/v0.9.1...v0.9.2

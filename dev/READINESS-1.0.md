@@ -1,6 +1,6 @@
 # define-err - 1.0 readiness
 
-> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.x; nothing listed here becomes final silently. Last updated 2026-11-18, at 0.10.0.
+> Where the crate stands against the definition of done (`PLAN.md` section 16), and everything accepted, deferred, or missed in the 0.x series that is still open. Kept current through 0.x; nothing listed here becomes final silently. Last updated 2026-11-25, at 0.10.1.
 
 ## What is left before 1.0
 
@@ -11,7 +11,7 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 | L-1 | Move the migration branch of noml-rust (PR 40) to 0.10: it pinned `"0.9"`, and report-err 0.9.0 depends on `^0.10`, so a build with both would hold two facades that Cargo cannot refuse (0.9 does not set `links`). mod-cli is left out: it is being replaced, and its migration PR is closed. | this crate's owner | done: noml-rust is on 0.10 and merged (noml-lang/noml-rust#40) |
 | L-2 | Re-run the 24-hour fuzz of the targets whose code changed in 0.10: `probe_decode` (the `Display` check, the retired public text) and `record_from_chain` (bidirectional controls). | this crate's owner | done 2026-11-19: 24 hours each at `nice 15`, no crash, leak, or timeout; `probe_decode` 26.1 billion runs, `record_from_chain` 6.1 billion; the other five targets are unchanged since D-066 |
 | L-3 | Re-run the 8-hour soak of every verb from 64 threads: the kinds mask changed in 0.10 (D-093). loom models the new mask; the soak checks it at scale. | this crate's owner | done 2026-11-18: 8 hours, 22,449 rounds of 100,000 calls on each of 64 threads with the mask changing throughout, exact counts, highest live memory 20,795 bytes; the ten-million run took 128 s |
-| L-4 | The performance pass on a quiet machine (ROADMAP 0.9 polish): every figure since 0.6 was taken at a load average of 47 to 130. | this crate's owner | open; needs a quiet machine, not more code |
+| L-4 | The performance pass on a quiet machine (ROADMAP 0.9 polish): every figure since 0.6 was taken at a load average of 47 to 130. | this crate's owner | done 2026-11-25 at a load average of 2 to 4 (D-101): two targets missed under load are met, `benches/baseline.txt` is regenerated, and the build-time figures are new |
 | L-5 | L2 (the attribute front end) builds against `docs/GENERATED-CODE.md` and passes the shared conformance suite. | the L2 owner | open: L2 is not started; `__private` changed in 0.10 (`ProbeBuf::new`) and is in `GENERATED-CODE.md` |
 | L-6 | L3 reads codes through the probe on the 0.10 line: report-err 0.9.0 depends on `^0.10`. | the L3 owner | done for the dependency; its migration away from `Identity::public` is report-err's |
 | L-7 | Two weeks of use with no API change. The last change was 0.10.0 on 2026-11-12, so the earliest date is 2026-11-26. | elapsed time | open |
@@ -52,17 +52,17 @@ In order. Each step is small and ends in a commit, a release, or a decision.
 
 | Item | Source | State |
 |---|---|---|
-| `Code` `Display` 24 ns against a 20 ns target | D-060, D-084 | Reduced in 0.9.1 (about 10%). Kept: `write!` of a short `&str` is 10.5 ns on its own, and the safe `from_utf8` check (4.5 ns) stays, since `unsafe` stays in one module. |
-| `warn()` after first delivery, 9.5 ns against 5 | D-060, D-084 | Kept: a cheaper key could deliver a site twice or drop a warning on a collision; `warn!` (0.5 ns) is the fast form. |
-| `report` filtered, 5.9 ns against 3 | D-060, D-084 | Kept: the cost is the panic guard around the error's own code (D-062); `report_with` is 0.64 ns. |
-| `identify` generated, 38 ns against 10 (26 before the 0.10 `Display` check); `report` to a no-op, 33 ns against 10 before 0.10 | D-060, D-091 | Kept unless a faster validation keeps the same checks: a hostile probe is validated once. |
+| `Code` `Display` 24 ns against a 20 ns target | D-060, D-084, D-101 | Met: 14.3 ns on the quiet machine. The 24 ns was the load. |
+| `warn()` after first delivery, 9.5 ns against 5 | D-060, D-084, D-101 | Met at the floor: 4.75 ns on the quiet machine (the criterion mean is 10.4 ns). `warn!` (0.27 ns) stays the fast form. |
+| `report` filtered, 3.16 ns against 3 | D-060, D-084, D-101 | Kept, 5% over on the quiet machine: the cost is the panic guard around the error's own code (D-062); `report_with` is 0.49 ns. |
+| `identify` generated, 19.9 ns against 10 with the 0.10 `Display` check; `report` to a no-op, 25.6 ns against 10 (quiet machine) | D-060, D-091, D-101 | Kept unless a faster validation keeps the same checks: a hostile probe is validated once. |
 | `log::warn!` comparison at level `Off` | D-060 | Kept: both are one load and a branch; the 20% target cannot be met. |
-| Incremental rebuild slower than thiserror on one crate | D-060 | Reduced in 0.9: a plain enum expands in one pass, 28% faster on 500 variants (D-082); a per-variant `const` row was slower (D-077). Still slower than thiserror; types with metadata keep five passes. |
-| 500-variant rebuild +11% from path display | D-067 | Kept for thiserror parity; re-measured with the tuning pass. |
+| Incremental rebuild slower than thiserror on one crate | D-060, D-101 | Kept: 0.03 s slower on the quiet machine (0.107 s against 0.078 s). The per-variant rework for types with metadata is closed: it would change generated code just before the freeze for a gain nobody notices. |
+| 500-variant rebuild +11% from path display | D-067, D-101 | Kept for thiserror parity. Re-measured: the whole 500-variant rebuild is 0.12 s slower than thiserror's (+64%). |
 | Early severity read drops a malformed low-severity probe | D-063 | Kept: severity filtering is not a security boundary (`docs/SECURITY.md`). |
 | Codes of a compiled-out type still count in its block's duplicate check | D-072 | Kept: errs towards a false duplicate, never a missed one. |
 | A crate past 1.0 takes define-err as a public dependency | D-070, D-092 | Policy recorded; the semver trick is carried out at 1.0, so a 1.x and a 2.x share one facade. Until then `links` refuses a second copy from 0.10 on. |
-| The `Display` check costs `identify` 16 ns | D-091 | Kept: the check is what refuses outside text shaped like a probe on Rust 1.81 to 1.89; it stays off the filtered `report` path. |
+| The `Display` check costs `identify` 16 ns (under load) | D-091 | Kept: the check is what refuses outside text shaped like a probe on Rust 1.81 to 1.89; it stays off the filtered `report` path. |
 | A forged low severity in outside text can drop its own event | D-063, D-091 | Kept: severity filtering is not a security boundary, and the check would cost every filtered `report` 16 ns. The event claims nothing when it is delivered. |
 | The downstream compiler's minimum Rust rises to 1.81; its existing lint findings | 19.4, D-076 | The owner's call, stated in the PR. |
 | Source size: 5,706 lines of code against a 5,000 target | NFR-14, D-080, D-087, D-088, D-091 to D-096 | Open: under the 6,000 at which OD-6 is reopened; reviewed in the 1.0 audit. |
